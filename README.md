@@ -29,7 +29,7 @@ Claudie is a local web dashboard that runs alongside Claude Code, giving you a v
 
 ```bash
 # Clone
-git clone https://github.com/ArtificialArtists/claudie.git
+git clone https://github.com/network-queen/claudie.git
 cd claudie
 
 # Install dependencies
