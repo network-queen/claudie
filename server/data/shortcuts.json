@@ -1,0 +1,98 @@
+[
+  {
+    "id": "newline",
+    "keys": "Shift+Enter",
+    "action": "Insert newline in input",
+    "context": "input",
+    "category": "editing",
+    "description": "Adds a new line in the input field without submitting the message. Essential for writing multi-line prompts, code snippets, or structured requests. Without this, pressing Enter submits the message."
+  },
+  {
+    "id": "toggle-plan-act",
+    "keys": "Shift+Tab",
+    "action": "Toggle Plan/Act mode",
+    "context": "input",
+    "category": "mode",
+    "description": "Toggles between Plan mode (read-only, exploration and analysis only) and Act mode (full read-write, can make changes). Plan mode is useful for analyzing complex problems before implementing, while Act mode is for execution."
+  },
+  {
+    "id": "undo-change",
+    "keys": "Escape Escape",
+    "action": "Undo last code change",
+    "context": "conversation",
+    "category": "control",
+    "description": "Double-pressing Escape undoes the last code change made by Claude. This is a safety net that lets you quickly revert a change you didn't want without having to manually undo it via git."
+  },
+  {
+    "id": "steer-generation",
+    "keys": "Enter",
+    "action": "Steer / add instructions during generation",
+    "context": "generation",
+    "category": "control",
+    "description": "While Claude is generating a response, pressing Enter opens an input field where you can add additional instructions or steer the response in a different direction. The new instructions are incorporated into the ongoing generation."
+  },
+  {
+    "id": "cancel-generation",
+    "keys": "Ctrl+C",
+    "action": "Cancel current generation",
+    "context": "generation",
+    "category": "control",
+    "description": "Interrupts and cancels Claude's current response generation. Useful when the response is going in the wrong direction or when you want to rephrase your request. The partial response is preserved in the conversation."
+  },
+  {
+    "id": "clear-conversation",
+    "keys": "Ctrl+L",
+    "action": "Clear conversation",
+    "context": "global",
+    "category": "navigation",
+    "description": "Clears the current conversation and starts fresh. This resets the conversation context while keeping any project configuration (CLAUDE.md, settings) intact. Useful when context gets too long or you want to start a new task."
+  },
+  {
+    "id": "input-history",
+    "keys": "Up Arrow",
+    "action": "Cycle through input history",
+    "context": "input",
+    "category": "navigation",
+    "description": "When the input field is empty, pressing the Up Arrow cycles through previously submitted messages. Works like shell history — lets you recall and reuse or modify previous prompts without retyping them."
+  },
+  {
+    "id": "accept-autocomplete",
+    "keys": "Tab",
+    "action": "Accept autocomplete suggestion",
+    "context": "input",
+    "category": "editing",
+    "description": "Accepts the current autocomplete suggestion in the input field. Autocomplete suggestions appear for file paths, command names, and other contextual completions as you type."
+  },
+  {
+    "id": "command-palette",
+    "keys": "/",
+    "action": "Open command palette / slash commands",
+    "context": "input",
+    "category": "navigation",
+    "description": "Typing / at the start of the input opens the command palette showing all available slash commands (skills). You can type to filter and select a command. Commands include /commit, /review-pr, /simplify, and others depending on installed skills."
+  },
+  {
+    "id": "shell-command",
+    "keys": "!",
+    "action": "Run shell command inline",
+    "context": "input",
+    "category": "control",
+    "description": "Typing ! at the start of the input allows you to run a shell command directly from the Claude Code input. The command output is shown in the conversation. Quick way to run shell commands without asking Claude to do it."
+  },
+  {
+    "id": "file-reference",
+    "keys": "@",
+    "action": "Reference files",
+    "context": "input",
+    "category": "editing",
+    "description": "Typing @ lets you reference files in your project. An autocomplete dropdown appears showing matching files. Referenced files are automatically read and included in the context, giving Claude direct access to their contents without a separate Read call."
+  },
+  {
+    "id": "symbol-reference",
+    "keys": "#",
+    "action": "Reference code symbols",
+    "context": "input",
+    "category": "editing",
+    "description": "Typing # lets you reference code symbols (functions, classes, variables) in your project. Uses LSP to find symbols and includes their definitions in the context. More precise than file references when you only need a specific symbol."
+  }
+]

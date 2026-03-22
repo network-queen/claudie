@@ -1,0 +1,88 @@
+{
+  "name": "claudie",
+  "version": "1.0.0",
+  "description": "IDE companion for Claude Code — manage projects, tasks, git, and Claude sessions from your browser",
+  "type": "module",
+  "bin": {
+    "claudie": "./bin/cli.js"
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "server/",
+    "public/",
+    "package.json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nicepkg/claudie.git"
+  },
+  "author": "nicepkg",
+  "homepage": "https://github.com/nicepkg/claudie#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "vite",
+    "dev:server": "tsx watch server/index.ts",
+    "build": "vite build",
+    "start": "tsx server/index.ts",
+    "preview": "npm run build && npm start",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "claude",
+    "ai",
+    "dashboard",
+    "developer-tools",
+    "claude-code"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@codemirror/lang-cpp": "^6.0.3",
+    "@codemirror/lang-css": "^6.3.1",
+    "@codemirror/lang-html": "^6.4.11",
+    "@codemirror/lang-java": "^6.0.2",
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/lang-rust": "^6.0.2",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/theme-one-dark": "^6.1.3",
+    "@codemirror/view": "^6.40.0",
+    "@types/multer": "^2.1.0",
+    "@types/ws": "^8.18.1",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/xterm": "^6.0.0",
+    "codemirror": "^6.0.2",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "glob": "^11.0.0",
+    "gray-matter": "^4.0.3",
+    "multer": "^2.1.1",
+    "open": "^10.1.0",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "^0.5.15",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.0",
+    "lucide-react": "^0.460.0",
+    "postcss": "^8.4.49",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.0",
+    "tailwindcss": "^3.4.16",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  }
+}

@@ -1,0 +1,595 @@
+[
+  {
+    "id": "commit",
+    "name": "Commit",
+    "command": "/commit",
+    "category": "git",
+    "description": "Creates a well-formatted git commit by analyzing all staged and unstaged changes. Follows the repository's existing commit message conventions, checks for sensitive files, and produces a concise commit message focused on the 'why' rather than the 'what'. Automatically stages relevant files and runs pre-commit hooks.",
+    "trigger": "User asks to commit changes, or types /commit in the input.",
+    "examples": [
+      { "input": "/commit", "description": "Analyze all changes and create a commit with an auto-generated message." },
+      { "input": "/commit -m 'Fix auth redirect loop'", "description": "Create a commit with a specific message." },
+      { "input": "commit my changes", "description": "Natural language trigger for the commit skill." }
+    ],
+    "tips": [
+      "The skill checks git status, git diff, and recent commit history to match the project's style.",
+      "It warns you if you're about to commit files that might contain secrets (.env, credentials).",
+      "Pre-commit hooks are always respected — if they fail, fix the issue and try again.",
+      "Commit messages are formatted with a HEREDOC and include a Co-Authored-By line."
+    ]
+  },
+  {
+    "id": "review-pr",
+    "name": "Review PR",
+    "command": "/review-pr",
+    "category": "git",
+    "description": "Reviews a pull request by examining all changes, commits, and context. Provides feedback on code quality, potential bugs, security concerns, and style consistency. Can review both local branches and remote PRs by number or URL.",
+    "trigger": "User asks to review a PR, or types /review-pr followed by a PR number or URL.",
+    "examples": [
+      { "input": "/review-pr 42", "description": "Review pull request #42 from the current repository." },
+      { "input": "/review-pr https://github.com/org/repo/pull/123", "description": "Review a PR by its full URL." },
+      { "input": "review this PR", "description": "Review the current branch's PR." }
+    ],
+    "tips": [
+      "The skill examines ALL commits in the PR, not just the latest one.",
+      "It checks for security issues, performance concerns, and code quality.",
+      "Provide the PR number as an argument for the best results."
+    ]
+  },
+  {
+    "id": "simplify",
+    "name": "Simplify",
+    "command": "/simplify",
+    "category": "workflow",
+    "description": "Reviews code for quality and suggests simplifications. Analyzes complexity, identifies redundant code, suggests cleaner patterns, and helps reduce technical debt. Focuses on making code more readable, maintainable, and idiomatic.",
+    "trigger": "User asks to simplify or review code quality, or types /simplify.",
+    "examples": [
+      { "input": "/simplify", "description": "Review the current file or recent changes for simplification opportunities." },
+      { "input": "/simplify src/utils/parser.ts", "description": "Simplify a specific file." },
+      { "input": "simplify this code", "description": "Natural language trigger after pasting or referencing code." }
+    ],
+    "tips": [
+      "Works great after implementing a feature — use it as a quality pass before committing.",
+      "Focuses on readability and idiomatic patterns for the language being used.",
+      "Can identify dead code, redundant logic, and overly complex abstractions."
+    ]
+  },
+  {
+    "id": "loop",
+    "name": "Loop",
+    "command": "/loop",
+    "category": "workflow",
+    "description": "Runs a recurring task in a loop — useful for watch-and-fix workflows. For example, run tests in a loop and fix failures until they pass, or continuously lint and fix until clean. Automates the edit-check-fix cycle.",
+    "trigger": "User asks to run something in a loop or repeatedly fix issues, or types /loop.",
+    "examples": [
+      { "input": "/loop npm test", "description": "Run tests in a loop, fixing failures until all pass." },
+      { "input": "/loop npm run lint", "description": "Run linter in a loop, fixing issues until clean." },
+      { "input": "keep running tests and fixing until they pass", "description": "Natural language trigger for the loop workflow." }
+    ],
+    "tips": [
+      "Great for TDD workflows — write failing tests then loop until they pass.",
+      "The loop will attempt to fix issues automatically between iterations.",
+      "Set reasonable expectations — complex test failures may need manual guidance."
+    ]
+  },
+  {
+    "id": "claude-api",
+    "name": "Claude API",
+    "command": "/claude-api",
+    "category": "project",
+    "description": "Provides specialized guidance for building with the Claude API and Anthropic SDKs. Understands Claude's API patterns, best practices, prompt engineering, tool use, streaming, and SDK-specific features for Python and TypeScript.",
+    "trigger": "User is building something with the Claude API or Anthropic SDK, or types /claude-api.",
+    "examples": [
+      { "input": "/claude-api", "description": "Get guidance on Claude API integration patterns." },
+      { "input": "/claude-api how do I use tool use", "description": "Get specific guidance on Claude's tool use feature." },
+      { "input": "help me build a Claude API integration", "description": "Natural language trigger for Claude API expertise." }
+    ],
+    "tips": [
+      "The skill has deep knowledge of Claude API parameters, limits, and best practices.",
+      "Great for understanding prompt engineering patterns specific to Claude.",
+      "Knows about both Python and TypeScript/JavaScript SDKs."
+    ]
+  },
+  {
+    "id": "update-config",
+    "name": "Update Config",
+    "command": "/update-config",
+    "category": "config",
+    "description": "Configures Claude Code settings, hooks, permissions, and project-level configuration. Can modify CLAUDE.md files, set up pre/post-commit hooks, configure permission modes, and manage project settings.",
+    "trigger": "User wants to configure Claude Code behavior, or types /update-config.",
+    "examples": [
+      { "input": "/update-config", "description": "Open configuration management to update settings." },
+      { "input": "/update-config add a pre-commit hook", "description": "Configure a specific hook." },
+      { "input": "configure Claude to always run prettier on save", "description": "Natural language config request." }
+    ],
+    "tips": [
+      "Use this to set up hooks that run automatically before or after certain actions.",
+      "Can configure permission modes to control what Claude can do without asking.",
+      "Manages both user-level and project-level configuration."
+    ]
+  },
+  {
+    "id": "keybindings-help",
+    "name": "Keybindings Help",
+    "command": "/keybindings-help",
+    "category": "config",
+    "description": "Shows and customizes keyboard shortcuts for Claude Code. Displays all available keybindings and allows customization of shortcuts for common actions.",
+    "trigger": "User asks about keyboard shortcuts or types /keybindings-help.",
+    "examples": [
+      { "input": "/keybindings-help", "description": "Show all available keyboard shortcuts." },
+      { "input": "what are the keyboard shortcuts", "description": "Natural language trigger to see keybindings." }
+    ],
+    "tips": [
+      "Useful for learning the full set of available shortcuts beyond the common ones.",
+      "Custom keybindings can be configured for frequently used actions."
+    ]
+  },
+  {
+    "id": "pdf",
+    "name": "PDF",
+    "command": "/pdf",
+    "category": "other",
+    "description": "Specialized PDF operations including reading, extracting text, analyzing content, and working with PDF documents. Provides enhanced PDF handling beyond basic Read tool capabilities.",
+    "trigger": "User needs to work with PDF files, or types /pdf.",
+    "examples": [
+      { "input": "/pdf analyze report.pdf", "description": "Analyze the contents of a PDF document." },
+      { "input": "/pdf extract tables from data.pdf", "description": "Extract tabular data from a PDF." }
+    ],
+    "tips": [
+      "For simple PDF reading, the Read tool with pages parameter may suffice.",
+      "This skill provides more advanced PDF operations beyond basic reading."
+    ]
+  },
+  {
+    "id": "gsd-new-project",
+    "name": "GSD: New Project",
+    "command": "/gsd:new-project",
+    "category": "workflow",
+    "description": "Initializes a new GSD (Get Stuff Done) project with structured milestones, phases, and tasks. Creates the project scaffold including CLAUDE.md configuration, milestone definitions, and initial planning artifacts.",
+    "trigger": "User wants to start a new structured project using the GSD workflow.",
+    "examples": [
+      { "input": "/gsd:new-project Build a REST API for user management", "description": "Initialize a new GSD project with the given description." },
+      { "input": "/gsd:new-project", "description": "Start the new project wizard interactively." }
+    ],
+    "tips": [
+      "GSD provides a structured workflow for complex projects — great for multi-day efforts.",
+      "The project setup creates milestones that break the work into manageable chunks.",
+      "Each milestone has phases: plan, execute, verify, and discuss."
+    ]
+  },
+  {
+    "id": "gsd-plan-phase",
+    "name": "GSD: Plan Phase",
+    "command": "/gsd:plan-phase",
+    "category": "workflow",
+    "description": "Enters the planning phase for the current GSD milestone. Analyzes requirements, breaks down tasks, identifies dependencies, and creates a detailed execution plan. Read-only exploration of the codebase to understand the scope.",
+    "trigger": "User is ready to plan the next phase of their GSD project.",
+    "examples": [
+      { "input": "/gsd:plan-phase", "description": "Start planning the current milestone's next phase." }
+    ],
+    "tips": [
+      "Planning phase is read-only — no code changes are made.",
+      "The plan will identify files to modify, new files to create, and potential risks."
+    ]
+  },
+  {
+    "id": "gsd-execute-phase",
+    "name": "GSD: Execute Phase",
+    "command": "/gsd:execute-phase",
+    "category": "workflow",
+    "description": "Executes the planned phase — implements the code changes, creates files, and builds the features defined in the plan. Follows the plan systematically, checking off tasks as they're completed.",
+    "trigger": "User has completed planning and is ready to implement.",
+    "examples": [
+      { "input": "/gsd:execute-phase", "description": "Start executing the current planned phase." }
+    ],
+    "tips": [
+      "Always plan before executing — the execute phase follows the plan created in plan-phase.",
+      "Execution tracks progress and can be paused and resumed."
+    ]
+  },
+  {
+    "id": "gsd-resume-work",
+    "name": "GSD: Resume Work",
+    "command": "/gsd:resume-work",
+    "category": "workflow",
+    "description": "Resumes work on a previously paused GSD project. Picks up where you left off, restoring context about the current milestone, phase, and task progress.",
+    "trigger": "User returns to a GSD project after a break or new session.",
+    "examples": [
+      { "input": "/gsd:resume-work", "description": "Resume the current GSD project where you left off." }
+    ],
+    "tips": [
+      "GSD stores progress in project files, so context is preserved across sessions.",
+      "Always resume rather than starting fresh to maintain continuity."
+    ]
+  },
+  {
+    "id": "gsd-pause-work",
+    "name": "GSD: Pause Work",
+    "command": "/gsd:pause-work",
+    "category": "workflow",
+    "description": "Pauses the current GSD work session, saving progress and context so it can be resumed later. Creates a checkpoint of the current state.",
+    "trigger": "User needs to stop working on the GSD project temporarily.",
+    "examples": [
+      { "input": "/gsd:pause-work", "description": "Pause the current session and save progress." }
+    ],
+    "tips": [
+      "Always pause rather than just closing — this saves your exact progress state.",
+      "Use /gsd:resume-work to pick up where you left off."
+    ]
+  },
+  {
+    "id": "gsd-debug",
+    "name": "GSD: Debug",
+    "command": "/gsd:debug",
+    "category": "workflow",
+    "description": "Enters a structured debugging mode within the GSD framework. Systematically investigates issues using a methodical approach — reproduce, isolate, identify root cause, and fix.",
+    "trigger": "User encounters a bug during GSD project execution.",
+    "examples": [
+      { "input": "/gsd:debug", "description": "Start structured debugging for the current issue." },
+      { "input": "/gsd:debug auth tokens expiring too early", "description": "Debug a specific issue." }
+    ],
+    "tips": [
+      "The debug skill follows a systematic approach: reproduce → isolate → root cause → fix.",
+      "Works within the GSD context to track debugging as part of project progress."
+    ]
+  },
+  {
+    "id": "gsd-verify-work",
+    "name": "GSD: Verify Work",
+    "command": "/gsd:verify-work",
+    "category": "workflow",
+    "description": "Verifies that completed work meets the requirements defined in the plan. Runs tests, checks acceptance criteria, and validates that the implementation matches the specification.",
+    "trigger": "User has completed execution and wants to verify the work.",
+    "examples": [
+      { "input": "/gsd:verify-work", "description": "Verify the current phase's work against its requirements." }
+    ],
+    "tips": [
+      "Run this after execute-phase to ensure everything was implemented correctly.",
+      "Checks both functional requirements and code quality."
+    ]
+  },
+  {
+    "id": "gsd-discuss-phase",
+    "name": "GSD: Discuss Phase",
+    "command": "/gsd:discuss-phase",
+    "category": "workflow",
+    "description": "Opens a discussion about the current phase — review decisions, discuss trade-offs, get feedback, or talk through concerns before or after implementation.",
+    "trigger": "User wants to discuss aspects of the current phase.",
+    "examples": [
+      { "input": "/gsd:discuss-phase", "description": "Start a discussion about the current phase." },
+      { "input": "/gsd:discuss-phase should we use Redis or Memcached for caching?", "description": "Discuss a specific topic." }
+    ],
+    "tips": [
+      "Great for talking through architectural decisions before committing to an approach.",
+      "Can be used at any point in the workflow — before, during, or after execution."
+    ]
+  },
+  {
+    "id": "gsd-progress",
+    "name": "GSD: Progress",
+    "command": "/gsd:progress",
+    "category": "workflow",
+    "description": "Shows the current progress of the GSD project — completed milestones, current phase status, remaining tasks, and overall completion percentage.",
+    "trigger": "User wants to see project progress or status.",
+    "examples": [
+      { "input": "/gsd:progress", "description": "Show current project progress and status." }
+    ],
+    "tips": [
+      "Use this regularly to stay oriented in larger projects.",
+      "Shows both high-level milestone progress and detailed task status."
+    ]
+  },
+  {
+    "id": "gsd-audit-milestone",
+    "name": "GSD: Audit Milestone",
+    "command": "/gsd:audit-milestone",
+    "category": "workflow",
+    "description": "Audits a completed milestone for quality, completeness, and adherence to requirements. Reviews all changes made during the milestone and identifies any gaps or issues.",
+    "trigger": "User has completed a milestone and wants a thorough review.",
+    "examples": [
+      { "input": "/gsd:audit-milestone", "description": "Audit the current or most recently completed milestone." }
+    ],
+    "tips": [
+      "Run this before marking a milestone as complete to catch any issues.",
+      "The audit checks code quality, test coverage, and requirement fulfillment."
+    ]
+  },
+  {
+    "id": "gsd-complete-milestone",
+    "name": "GSD: Complete Milestone",
+    "command": "/gsd:complete-milestone",
+    "category": "workflow",
+    "description": "Marks the current milestone as complete. Summarizes what was accomplished, creates a record of the milestone, and transitions to the next milestone if one exists.",
+    "trigger": "User has finished all work and verification for the current milestone.",
+    "examples": [
+      { "input": "/gsd:complete-milestone", "description": "Mark the current milestone as complete and move on." }
+    ],
+    "tips": [
+      "Run /gsd:audit-milestone first to ensure quality.",
+      "Completing a milestone automatically transitions to the next one if available."
+    ]
+  },
+  {
+    "id": "gsd-new-milestone",
+    "name": "GSD: New Milestone",
+    "command": "/gsd:new-milestone",
+    "category": "workflow",
+    "description": "Creates a new milestone within the current GSD project. Defines the scope, goals, acceptance criteria, and phases for the new milestone.",
+    "trigger": "User needs to add a new milestone to the project plan.",
+    "examples": [
+      { "input": "/gsd:new-milestone Add user notification system", "description": "Create a new milestone with the given scope." }
+    ],
+    "tips": [
+      "Milestones should be self-contained and deliverable on their own.",
+      "Keep milestone scope manageable — break large efforts into multiple milestones."
+    ]
+  },
+  {
+    "id": "gsd-add-phase",
+    "name": "GSD: Add Phase",
+    "command": "/gsd:add-phase",
+    "category": "workflow",
+    "description": "Adds a new phase to the current milestone. Phases represent distinct stages of work within a milestone (e.g., setup, core implementation, testing, polish).",
+    "trigger": "User needs to add an additional phase to the current milestone.",
+    "examples": [
+      { "input": "/gsd:add-phase", "description": "Add a new phase to the current milestone." },
+      { "input": "/gsd:add-phase Add performance optimization phase", "description": "Add a specifically scoped phase." }
+    ],
+    "tips": [
+      "Phases are sequential — they execute in order within a milestone.",
+      "Each phase goes through plan → execute → verify."
+    ]
+  },
+  {
+    "id": "gsd-insert-phase",
+    "name": "GSD: Insert Phase",
+    "command": "/gsd:insert-phase",
+    "category": "workflow",
+    "description": "Inserts a new phase at a specific position in the milestone's phase sequence. Useful when you realize an intermediate step is needed between existing phases.",
+    "trigger": "User needs to insert a phase between existing phases.",
+    "examples": [
+      { "input": "/gsd:insert-phase", "description": "Insert a phase at a specific position." }
+    ],
+    "tips": [
+      "Use this when you discover a missing step mid-execution rather than appending at the end."
+    ]
+  },
+  {
+    "id": "gsd-remove-phase",
+    "name": "GSD: Remove Phase",
+    "command": "/gsd:remove-phase",
+    "category": "workflow",
+    "description": "Removes a phase from the current milestone. Useful when a planned phase is no longer needed or has been absorbed into another phase.",
+    "trigger": "User decides a phase is no longer necessary.",
+    "examples": [
+      { "input": "/gsd:remove-phase", "description": "Remove a phase from the current milestone." }
+    ],
+    "tips": [
+      "Cannot remove a phase that is currently in progress — pause or complete it first.",
+      "Removing a phase doesn't undo any work already done."
+    ]
+  },
+  {
+    "id": "gsd-map-codebase",
+    "name": "GSD: Map Codebase",
+    "command": "/gsd:map-codebase",
+    "category": "workflow",
+    "description": "Explores and maps the project's codebase structure, creating an understanding of the architecture, key files, patterns, and dependencies. Results feed into better planning and execution.",
+    "trigger": "User wants to understand the codebase structure before starting work.",
+    "examples": [
+      { "input": "/gsd:map-codebase", "description": "Map the current project's codebase structure." }
+    ],
+    "tips": [
+      "Run this early in a project to build foundational understanding.",
+      "The mapping results are used by subsequent planning phases for better decisions."
+    ]
+  },
+  {
+    "id": "gsd-check-todos",
+    "name": "GSD: Check TODOs",
+    "command": "/gsd:check-todos",
+    "category": "workflow",
+    "description": "Scans the codebase for TODO, FIXME, HACK, and similar markers. Lists them with context and can prioritize them for the current milestone.",
+    "trigger": "User wants to see outstanding TODOs in the codebase.",
+    "examples": [
+      { "input": "/gsd:check-todos", "description": "Scan for and list all TODO markers in the project." }
+    ],
+    "tips": [
+      "Great for finding loose ends before completing a milestone.",
+      "Can differentiate between existing TODOs and ones added during the current work."
+    ]
+  },
+  {
+    "id": "gsd-add-todo",
+    "name": "GSD: Add TODO",
+    "command": "/gsd:add-todo",
+    "category": "workflow",
+    "description": "Adds a new TODO item to the GSD project's task tracking. These TODOs are tracked separately from code comments and can be assigned to milestones or phases.",
+    "trigger": "User wants to track a new task or TODO item.",
+    "examples": [
+      { "input": "/gsd:add-todo Add input validation for the API endpoints", "description": "Add a specific TODO to the project." }
+    ],
+    "tips": [
+      "GSD TODOs are tracked in project files, not as code comments.",
+      "TODOs can be associated with specific milestones or phases."
+    ]
+  },
+  {
+    "id": "gsd-quick",
+    "name": "GSD: Quick",
+    "command": "/gsd:quick",
+    "category": "workflow",
+    "description": "Performs a quick GSD task without full project ceremony. For small, well-defined tasks that don't need full milestone/phase tracking. Think of it as a lightweight mode for quick wins.",
+    "trigger": "User has a small, quick task that doesn't need full GSD workflow.",
+    "examples": [
+      { "input": "/gsd:quick fix the typo in the header", "description": "Handle a small task quickly." },
+      { "input": "/gsd:quick add error handling to the login function", "description": "Quick, focused task." }
+    ],
+    "tips": [
+      "Use this for tasks that take less than a few minutes.",
+      "Still follows GSD quality standards but without full project overhead."
+    ]
+  },
+  {
+    "id": "gsd-health",
+    "name": "GSD: Health",
+    "command": "/gsd:health",
+    "category": "workflow",
+    "description": "Checks the health of the GSD project — file integrity, configuration validity, milestone consistency, and overall project state. Identifies and can fix issues with the GSD project files.",
+    "trigger": "User suspects something is wrong with the GSD project state.",
+    "examples": [
+      { "input": "/gsd:health", "description": "Run a health check on the GSD project." }
+    ],
+    "tips": [
+      "Run this if you encounter unexpected behavior in the GSD workflow.",
+      "Can automatically fix common issues with project file integrity."
+    ]
+  },
+  {
+    "id": "gsd-help",
+    "name": "GSD: Help",
+    "command": "/gsd:help",
+    "category": "workflow",
+    "description": "Shows help and documentation for the GSD workflow system. Lists all available GSD commands, explains the workflow stages, and provides guidance on effective usage.",
+    "trigger": "User is new to GSD or needs help with GSD commands.",
+    "examples": [
+      { "input": "/gsd:help", "description": "Show GSD help and documentation." }
+    ],
+    "tips": [
+      "Start here if you're new to the GSD workflow.",
+      "Shows all available GSD commands with brief descriptions."
+    ]
+  },
+  {
+    "id": "gsd-settings",
+    "name": "GSD: Settings",
+    "command": "/gsd:settings",
+    "category": "workflow",
+    "description": "Manages GSD project settings and preferences. Configure behavior like auto-verification, phase templates, default milestone structure, and integration options.",
+    "trigger": "User wants to customize GSD behavior.",
+    "examples": [
+      { "input": "/gsd:settings", "description": "View and modify GSD settings." }
+    ],
+    "tips": [
+      "Settings are stored per-project, so different projects can have different configurations."
+    ]
+  },
+  {
+    "id": "gsd-set-profile",
+    "name": "GSD: Set Profile",
+    "command": "/gsd:set-profile",
+    "category": "workflow",
+    "description": "Sets the GSD profile which determines the workflow style and defaults. Profiles can be customized for different types of projects (web app, library, data pipeline, etc.).",
+    "trigger": "User wants to change the GSD profile or workflow style.",
+    "examples": [
+      { "input": "/gsd:set-profile", "description": "Change the current GSD profile." }
+    ],
+    "tips": [
+      "Profiles affect phase templates, verification criteria, and default settings.",
+      "Choose a profile that matches your project type for the best experience."
+    ]
+  },
+  {
+    "id": "gsd-cleanup",
+    "name": "GSD: Cleanup",
+    "command": "/gsd:cleanup",
+    "category": "workflow",
+    "description": "Cleans up GSD project artifacts — removes completed milestone files, archives old data, and reduces clutter in the project directory.",
+    "trigger": "User wants to clean up GSD project files.",
+    "examples": [
+      { "input": "/gsd:cleanup", "description": "Clean up GSD project artifacts." }
+    ],
+    "tips": [
+      "Run this periodically to keep the project directory clean.",
+      "Archived data can still be referenced but won't clutter the active workspace."
+    ]
+  },
+  {
+    "id": "gsd-plan-milestone-gaps",
+    "name": "GSD: Plan Milestone Gaps",
+    "command": "/gsd:plan-milestone-gaps",
+    "category": "workflow",
+    "description": "Analyzes the current milestone plan and identifies gaps — missing requirements, untested edge cases, unaddressed risks, or overlooked dependencies.",
+    "trigger": "User wants to ensure the milestone plan is complete.",
+    "examples": [
+      { "input": "/gsd:plan-milestone-gaps", "description": "Identify gaps in the current milestone plan." }
+    ],
+    "tips": [
+      "Run this after initial planning to catch what was missed.",
+      "Gaps are presented with suggested additions to the plan."
+    ]
+  },
+  {
+    "id": "gsd-list-phase-assumptions",
+    "name": "GSD: List Phase Assumptions",
+    "command": "/gsd:list-phase-assumptions",
+    "category": "workflow",
+    "description": "Lists assumptions made during the planning phase. Makes implicit assumptions explicit so they can be validated or challenged before execution begins.",
+    "trigger": "User wants to review assumptions before executing a phase.",
+    "examples": [
+      { "input": "/gsd:list-phase-assumptions", "description": "List all assumptions for the current phase." }
+    ],
+    "tips": [
+      "Review assumptions before execution — incorrect assumptions are a major source of bugs.",
+      "Challenge each assumption and verify it's still valid."
+    ]
+  },
+  {
+    "id": "gsd-research-phase",
+    "name": "GSD: Research Phase",
+    "command": "/gsd:research-phase",
+    "category": "workflow",
+    "description": "Conducts research for the current phase — explores documentation, investigates libraries, checks compatibility, and gathers information needed for informed implementation decisions.",
+    "trigger": "User needs to research before implementing a phase.",
+    "examples": [
+      { "input": "/gsd:research-phase", "description": "Start research for the current phase." }
+    ],
+    "tips": [
+      "Research phase is read-only like plan phase — no code changes.",
+      "Results feed directly into better planning and execution."
+    ]
+  },
+  {
+    "id": "gsd-update",
+    "name": "GSD: Update",
+    "command": "/gsd:update",
+    "category": "workflow",
+    "description": "Updates the GSD skill to the latest version. Checks for new versions and applies updates to get the latest features and fixes.",
+    "trigger": "User wants to update the GSD skill.",
+    "examples": [
+      { "input": "/gsd:update", "description": "Check for and apply GSD updates." }
+    ],
+    "tips": [
+      "Check for updates periodically to get new features and bug fixes.",
+      "Updates are applied to the skill configuration, not to your project files."
+    ]
+  },
+  {
+    "id": "gsd-reapply-patches",
+    "name": "GSD: Reapply Patches",
+    "command": "/gsd:reapply-patches",
+    "category": "workflow",
+    "description": "Reapplies GSD patches to the configuration. Useful after updates or when configuration has been manually modified and needs to be resynchronized.",
+    "trigger": "GSD configuration needs to be re-patched after changes.",
+    "examples": [
+      { "input": "/gsd:reapply-patches", "description": "Reapply configuration patches." }
+    ],
+    "tips": [
+      "Use this if GSD behavior seems inconsistent after manual config changes."
+    ]
+  },
+  {
+    "id": "gsd-join-discord",
+    "name": "GSD: Join Discord",
+    "command": "/gsd:join-discord",
+    "category": "other",
+    "description": "Provides the invite link to join the GSD community Discord server for support, discussion, and feature requests.",
+    "trigger": "User wants to join the GSD community.",
+    "examples": [
+      { "input": "/gsd:join-discord", "description": "Get the Discord invite link." }
+    ],
+    "tips": [
+      "The Discord community is a great place to get help and share feedback."
+    ]
+  }
+]

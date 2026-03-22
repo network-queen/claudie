@@ -1,0 +1,886 @@
+[
+  {
+    "id": "read",
+    "name": "Read",
+    "category": "file-ops",
+    "icon": "FileText",
+    "description": "Reads a file from the local filesystem. Supports text files, images (PNG, JPG), PDFs, and Jupyter notebooks (.ipynb). Results are returned with line numbers (cat -n format). For large files, use offset and limit parameters to read specific sections. For PDFs, use the pages parameter to read specific page ranges (max 20 pages per request).",
+    "when_to_use": "Use Read whenever you need to view file contents, examine images, read PDFs, or inspect notebook cells. Always use Read before using Edit or Write on existing files. Use offset/limit for large files to avoid loading unnecessary content.",
+    "when_not_to_use": "Do not use Read to list directory contents — use Bash with ls instead. Do not read entire large files when you only need a specific section — use offset/limit. Do not use Read when you need to search for content across many files — use Grep instead.",
+    "parameters": [
+      { "name": "file_path", "type": "string", "required": true, "description": "The absolute path to the file to read. Must be absolute, not relative." },
+      { "name": "offset", "type": "number", "required": false, "description": "The line number to start reading from. Only provide if the file is too large to read at once." },
+      { "name": "limit", "type": "number", "required": false, "description": "The number of lines to read. Only provide if the file is too large to read at once. Default reads up to 2000 lines." },
+      { "name": "pages", "type": "string", "required": false, "description": "Page range for PDF files (e.g., '1-5', '3', '10-20'). Only applicable to PDF files. Maximum 20 pages per request. Required for PDFs over 10 pages." }
+    ],
+    "examples": [
+      {
+        "title": "Read a source file",
+        "description": "Read an entire TypeScript file to understand its structure before making edits.",
+        "code": "Read({ file_path: '/project/src/components/App.tsx' })"
+      },
+      {
+        "title": "Read a specific section of a large file",
+        "description": "Read lines 100-200 of a large log file to inspect a specific error.",
+        "code": "Read({ file_path: '/var/log/app.log', offset: 100, limit: 100 })"
+      },
+      {
+        "title": "Read specific pages of a PDF",
+        "description": "Read pages 5 through 10 of a large PDF document.",
+        "code": "Read({ file_path: '/docs/specification.pdf', pages: '5-10' })"
+      }
+    ],
+    "tips": [
+      "Always read a file before using Edit or Write on it — these tools will error if you haven't read first.",
+      "For files over 2000 lines, use offset and limit to read in chunks rather than trying to read everything at once.",
+      "When reading images, the contents are presented visually since Claude is multimodal — useful for reviewing screenshots or diagrams.",
+      "For large PDFs (>10 pages), you MUST use the pages parameter or the read will fail."
+    ],
+    "related_tools": ["edit", "write", "grep"]
+  },
+  {
+    "id": "write",
+    "name": "Write",
+    "category": "file-ops",
+    "icon": "FilePlus",
+    "description": "Writes content to a file on the local filesystem. If the file already exists, it will be completely overwritten. You must read an existing file with Read before overwriting it. Primarily intended for creating new files or performing complete rewrites.",
+    "when_to_use": "Use Write to create brand new files that don't exist yet. Also use it when you need to completely rewrite a file's contents rather than making surgical edits. Good for generating config files, new components, or test files from scratch.",
+    "when_not_to_use": "Do not use Write to make small changes to existing files — use Edit instead, which only sends the diff and is more efficient. Never use Write to create documentation files (*.md, README) unless the user explicitly requests it.",
+    "parameters": [
+      { "name": "file_path", "type": "string", "required": true, "description": "The absolute path to the file to write. Must be absolute, not relative." },
+      { "name": "content", "type": "string", "required": true, "description": "The complete content to write to the file." }
+    ],
+    "examples": [
+      {
+        "title": "Create a new React component",
+        "description": "Create a new Button component file from scratch.",
+        "code": "Write({ file_path: '/project/src/components/Button.tsx', content: 'import React from \"react\";\\n\\nexport const Button = ({ label, onClick }) => {\\n  return <button onClick={onClick}>{label}</button>;\\n};' })"
+      },
+      {
+        "title": "Create a configuration file",
+        "description": "Generate a new ESLint config file for a project.",
+        "code": "Write({ file_path: '/project/.eslintrc.json', content: '{\\n  \"extends\": [\"next/core-web-vitals\"],\\n  \"rules\": {\\n    \"no-unused-vars\": \"warn\"\\n  }\\n}' })"
+      },
+      {
+        "title": "Create a test file",
+        "description": "Write a new test suite for a utility module.",
+        "code": "Write({ file_path: '/project/src/utils/__tests__/helpers.test.ts', content: 'import { formatDate } from \"../helpers\";\\n\\ndescribe(\"formatDate\", () => {\\n  it(\"formats ISO dates correctly\", () => {\\n    expect(formatDate(\"2024-01-15\")).toBe(\"Jan 15, 2024\");\\n  });\\n});' })"
+      }
+    ],
+    "tips": [
+      "Always prefer Edit for modifying existing files — Write sends the entire file content which is less efficient for small changes.",
+      "You MUST read an existing file with Read before overwriting it, or the tool will fail.",
+      "Use Write for new files and Edit for modifications — this is the most important distinction between the two tools."
+    ],
+    "related_tools": ["read", "edit"]
+  },
+  {
+    "id": "edit",
+    "name": "Edit",
+    "category": "file-ops",
+    "icon": "Pencil",
+    "description": "Performs exact string replacements in files. Finds old_string in the file and replaces it with new_string. The old_string must be unique in the file unless replace_all is set to true. Preserves exact indentation. You must Read the file at least once before editing.",
+    "when_to_use": "Use Edit for any surgical modification to existing files — changing a function, fixing a bug, updating an import, renaming a variable (with replace_all). It's the preferred tool for modifying existing code since it only sends the diff.",
+    "when_not_to_use": "Do not use Edit if old_string is not unique in the file — either expand the context to make it unique or use replace_all. Do not use Edit for creating entirely new files — use Write instead. Do not include line number prefixes from Read output in old_string or new_string.",
+    "parameters": [
+      { "name": "file_path", "type": "string", "required": true, "description": "The absolute path to the file to modify." },
+      { "name": "old_string", "type": "string", "required": true, "description": "The exact text to find and replace. Must be unique in the file unless replace_all is true." },
+      { "name": "new_string", "type": "string", "required": true, "description": "The text to replace old_string with. Must be different from old_string." },
+      { "name": "replace_all", "type": "boolean", "required": false, "description": "If true, replaces ALL occurrences of old_string in the file. Default is false. Useful for renaming variables or updating repeated patterns." }
+    ],
+    "examples": [
+      {
+        "title": "Fix a bug in a function",
+        "description": "Change an incorrect comparison operator in a conditional statement.",
+        "code": "Edit({ file_path: '/project/src/utils.ts', old_string: 'if (count >= max)', new_string: 'if (count > max)' })"
+      },
+      {
+        "title": "Rename a variable across a file",
+        "description": "Rename all occurrences of a variable from 'userData' to 'userProfile'.",
+        "code": "Edit({ file_path: '/project/src/api.ts', old_string: 'userData', new_string: 'userProfile', replace_all: true })"
+      },
+      {
+        "title": "Add an import statement",
+        "description": "Add a new import at the top of a file by replacing the first existing import line with itself plus the new import.",
+        "code": "Edit({ file_path: '/project/src/App.tsx', old_string: 'import React from \"react\";', new_string: 'import React from \"react\";\\nimport { useState } from \"react\";' })"
+      }
+    ],
+    "tips": [
+      "Always include enough surrounding context in old_string to make it unique — if the edit fails, expand the match string.",
+      "Preserve exact indentation from the file. The line number prefix from Read output (spaces + number + tab) is NOT part of the file content.",
+      "Use replace_all: true for renaming variables, updating repeated strings, or changing patterns that appear multiple times.",
+      "You must Read the file at least once in the conversation before using Edit, or it will error."
+    ],
+    "related_tools": ["read", "write", "notebook_edit"]
+  },
+  {
+    "id": "bash",
+    "name": "Bash",
+    "category": "execution",
+    "icon": "Terminal",
+    "description": "Executes bash commands in the system shell and returns output. The working directory persists between calls but shell state (variables, aliases) does not. Supports optional timeout (up to 10 minutes) and background execution. The shell is initialized from the user's profile.",
+    "when_to_use": "Use Bash for running build commands, git operations, package management (npm, pip), starting dev servers, running tests, listing directories, and any shell operation. Use it when dedicated tools don't cover your need.",
+    "when_not_to_use": "Do NOT use Bash to run grep, cat, head, tail, sed, awk, find, or echo when dedicated tools (Grep, Read, Edit, Write, Glob) can do the job. Those dedicated tools provide a better experience. Avoid interactive commands (vim, git rebase -i, etc.) as they require TTY input.",
+    "parameters": [
+      { "name": "command", "type": "string", "required": true, "description": "The bash command to execute." },
+      { "name": "description", "type": "string", "required": false, "description": "Clear, concise description of what the command does. Keep brief for simple commands, add context for complex ones." },
+      { "name": "timeout", "type": "number", "required": false, "description": "Optional timeout in milliseconds, up to 600000 (10 minutes). Default is 120000 (2 minutes)." },
+      { "name": "run_in_background", "type": "boolean", "required": false, "description": "Set to true to run the command in the background. Use TaskOutput to read results later. Good for long-running processes like dev servers." }
+    ],
+    "examples": [
+      {
+        "title": "Install dependencies and start dev server",
+        "description": "Install npm packages then start the development server in the background.",
+        "code": "Bash({ command: 'cd /project && npm install', description: 'Install npm dependencies' })\nBash({ command: 'cd /project && npm run dev', run_in_background: true, description: 'Start dev server in background' })"
+      },
+      {
+        "title": "Run tests with timeout",
+        "description": "Run the test suite with an extended timeout for large projects.",
+        "code": "Bash({ command: 'cd /project && npm test -- --coverage', timeout: 300000, description: 'Run tests with coverage' })"
+      },
+      {
+        "title": "Git operations",
+        "description": "Check branch status and recent commits.",
+        "code": "Bash({ command: 'git -C /project status && git -C /project log --oneline -10', description: 'Show git status and recent commits' })"
+      }
+    ],
+    "tips": [
+      "Use absolute paths or 'cd /path &&' since the working directory resets between calls — shell state does not persist.",
+      "For long-running commands like dev servers, use run_in_background: true instead of appending '&'.",
+      "Chain dependent commands with '&&' in a single call. Run independent commands as separate parallel Bash calls.",
+      "Never use interactive flags like -i (git rebase -i, git add -i) as they require TTY input which is not supported."
+    ],
+    "related_tools": ["glob", "grep", "read", "task_create"]
+  },
+  {
+    "id": "glob",
+    "name": "Glob",
+    "category": "search",
+    "icon": "FolderSearch",
+    "description": "Fast file pattern matching tool that works with any codebase size. Supports standard glob patterns like '**/*.js' or 'src/**/*.ts'. Returns matching file paths sorted by modification time (most recently modified first).",
+    "when_to_use": "Use Glob when you need to find files by name or extension pattern. Great for discovering project structure, finding all files of a type, or locating specific config files. Faster and more appropriate than using find or ls via Bash.",
+    "when_not_to_use": "Do not use Glob when you need to search file contents — use Grep for that. Do not use Glob for complex queries that might require multiple rounds of searching — use the Agent tool instead.",
+    "parameters": [
+      { "name": "pattern", "type": "string", "required": true, "description": "The glob pattern to match files against, e.g., '**/*.tsx', 'src/**/index.ts', '*.json'." },
+      { "name": "path", "type": "string", "required": false, "description": "The directory to search in. Defaults to the current working directory. Must be a valid directory path if provided." }
+    ],
+    "examples": [
+      {
+        "title": "Find all TypeScript React files",
+        "description": "Locate all .tsx files in the project source directory.",
+        "code": "Glob({ pattern: 'src/**/*.tsx', path: '/project' })"
+      },
+      {
+        "title": "Find configuration files",
+        "description": "Find all JSON config files in the project root.",
+        "code": "Glob({ pattern: '*.{json,yaml,yml,toml}', path: '/project' })"
+      },
+      {
+        "title": "Find test files",
+        "description": "Find all test files across the entire project.",
+        "code": "Glob({ pattern: '**/*.{test,spec}.{ts,tsx,js,jsx}', path: '/project' })"
+      }
+    ],
+    "tips": [
+      "Use '**/' to match any depth of directories — e.g., '**/*.ts' finds TypeScript files at any nesting level.",
+      "Results are sorted by modification time, so recently changed files appear first — useful for finding what was last worked on.",
+      "Run multiple Glob calls in parallel with different patterns when you're exploring a codebase structure."
+    ],
+    "related_tools": ["grep", "bash", "read"]
+  },
+  {
+    "id": "grep",
+    "name": "Grep",
+    "category": "search",
+    "icon": "Search",
+    "description": "A powerful content search tool built on ripgrep. Supports full regex syntax, multiple output modes (content, files_with_matches, count), context lines, multiline matching, file type and glob filters, and pagination with head_limit and offset. Always use this instead of running grep or rg via Bash.",
+    "when_to_use": "Use Grep whenever you need to search for text patterns, function definitions, variable usage, error messages, imports, or any content across files. It's the primary tool for understanding how code is used across a codebase.",
+    "when_not_to_use": "Do not use Grep to find files by name — use Glob for that. For open-ended searches requiring multiple rounds of exploration, consider using the Agent tool. Do not use Bash to run grep/rg commands — always use this dedicated tool.",
+    "parameters": [
+      { "name": "pattern", "type": "string", "required": true, "description": "The regex pattern to search for. Uses ripgrep syntax. Literal braces need escaping (e.g., 'interface\\\\{\\\\}' for Go)." },
+      { "name": "path", "type": "string", "required": false, "description": "File or directory to search in. Defaults to current working directory." },
+      { "name": "output_mode", "type": "string", "required": false, "description": "Output mode: 'content' shows matching lines with context, 'files_with_matches' shows only file paths (default), 'count' shows match counts per file." },
+      { "name": "glob", "type": "string", "required": false, "description": "Glob pattern to filter files, e.g., '*.js', '*.{ts,tsx}'. Maps to rg --glob." },
+      { "name": "type", "type": "string", "required": false, "description": "File type filter, e.g., 'js', 'py', 'rust', 'go'. More efficient than glob for standard file types." },
+      { "name": "-i", "type": "boolean", "required": false, "description": "Case insensitive search." },
+      { "name": "-n", "type": "boolean", "required": false, "description": "Show line numbers in output. Requires output_mode: 'content'. Defaults to true." },
+      { "name": "-A", "type": "number", "required": false, "description": "Number of lines to show after each match. Requires output_mode: 'content'." },
+      { "name": "-B", "type": "number", "required": false, "description": "Number of lines to show before each match. Requires output_mode: 'content'." },
+      { "name": "-C", "type": "number", "required": false, "description": "Number of context lines before and after each match. Alias for 'context'. Requires output_mode: 'content'." },
+      { "name": "context", "type": "number", "required": false, "description": "Number of lines to show before and after each match. Requires output_mode: 'content'." },
+      { "name": "multiline", "type": "boolean", "required": false, "description": "Enable multiline mode where . matches newlines and patterns can span lines. Default: false." },
+      { "name": "head_limit", "type": "number", "required": false, "description": "Limit output to first N lines/entries. Works across all output modes. Default: 0 (unlimited)." },
+      { "name": "offset", "type": "number", "required": false, "description": "Skip first N lines/entries before applying head_limit. Default: 0." }
+    ],
+    "examples": [
+      {
+        "title": "Find all usages of a function",
+        "description": "Search for all calls to fetchUserData across TypeScript files with surrounding context.",
+        "code": "Grep({ pattern: 'fetchUserData', type: 'ts', output_mode: 'content', -C: 2 })"
+      },
+      {
+        "title": "Find files containing a pattern",
+        "description": "Get a list of all files that import from a specific package.",
+        "code": "Grep({ pattern: 'from [\"\\']@tanstack/react-query', glob: '*.{ts,tsx}', output_mode: 'files_with_matches' })"
+      },
+      {
+        "title": "Count occurrences across codebase",
+        "description": "Count how many TODO comments exist in each file.",
+        "code": "Grep({ pattern: 'TODO', output_mode: 'count', path: '/project/src' })"
+      }
+    ],
+    "tips": [
+      "Use output_mode: 'files_with_matches' (default) when you just need to know which files match, and 'content' when you need to see the actual code.",
+      "Combine glob or type filters with your pattern to narrow results — searching the whole codebase can be noisy.",
+      "Use multiline: true when searching for patterns that span multiple lines, like multi-line function signatures or struct definitions.",
+      "Use head_limit to cap results when you expect many matches and only need to see the first few."
+    ],
+    "related_tools": ["glob", "read", "bash"]
+  },
+  {
+    "id": "agent",
+    "name": "Agent",
+    "category": "orchestration",
+    "icon": "Bot",
+    "description": "Spawns sub-agents for complex, multi-step tasks. Sub-agents can perform independent research, exploration, or execution in parallel. Supports different agent types including general-purpose, Explore (for codebase exploration), Plan (for planning), and specialized testers. Agents can run in background and in isolated git worktrees.",
+    "when_to_use": "Use Agent for complex tasks that benefit from parallelism or isolation — exploring multiple codepaths simultaneously, researching a topic while continuing other work, running a plan phase, or testing in an isolated worktree. Great for divide-and-conquer approaches.",
+    "when_not_to_use": "Do not spawn agents for simple tasks that can be done directly with a single tool call. Avoid unnecessary agents as they add overhead. Don't use agents when you need the results immediately in a tight sequence — they're best for parallel or background work.",
+    "parameters": [
+      { "name": "task", "type": "string", "required": true, "description": "The task description for the sub-agent to execute." },
+      { "name": "type", "type": "string", "required": false, "description": "Agent type: general, explore, plan, python-tester, etc." },
+      { "name": "run_in_background", "type": "boolean", "required": false, "description": "Whether to run the agent in the background." },
+      { "name": "worktree", "type": "boolean", "required": false, "description": "Whether to run the agent in an isolated git worktree." }
+    ],
+    "examples": [
+      {
+        "title": "Explore codebase architecture",
+        "description": "Spawn an explore agent to map out the project structure and key patterns.",
+        "code": "Agent({ task: 'Explore the /project/src directory and identify the main architecture patterns, key entry points, and data flow between components.', type: 'explore' })"
+      },
+      {
+        "title": "Parallel research",
+        "description": "Run two agents in parallel to research different aspects of a problem.",
+        "code": "Agent({ task: 'Research how authentication is implemented in this project', run_in_background: true })\nAgent({ task: 'Research how database queries are structured in this project', run_in_background: true })"
+      },
+      {
+        "title": "Isolated testing in worktree",
+        "description": "Test a risky change in an isolated git worktree without affecting the main working directory.",
+        "code": "Agent({ task: 'Try refactoring the auth module to use JWT tokens instead of sessions and run the test suite', worktree: true })"
+      }
+    ],
+    "tips": [
+      "Use background agents for long-running tasks so you can continue working while they execute.",
+      "Worktree agents are perfect for experimental changes that might break things — they work in complete isolation.",
+      "Prefer spawning 2-3 focused agents over one agent with a massive task — smaller scopes produce better results."
+    ],
+    "related_tools": ["task_create", "enter_worktree", "enter_plan_mode"]
+  },
+  {
+    "id": "skill",
+    "name": "Skill",
+    "category": "orchestration",
+    "icon": "Zap",
+    "description": "Invokes registered skills (slash commands) within the conversation. Skills provide specialized capabilities and domain knowledge. When users reference a slash command like /commit or /review-pr, use this tool to invoke it. Skills are listed in system-reminder messages.",
+    "when_to_use": "Use Skill when a user asks for a task that matches a registered skill — creating commits (/commit), reviewing PRs (/review-pr), simplifying code (/simplify), etc. Always invoke the skill BEFORE generating any other response about the task.",
+    "when_not_to_use": "Do not invoke a skill that is already running in the current turn. Do not use this for built-in CLI commands like /help, /clear, /compact. Do not invoke a skill if you see a <command-name> tag already in the current turn — the skill has already been loaded.",
+    "parameters": [
+      { "name": "skill", "type": "string", "required": true, "description": "The skill name, e.g., 'commit', 'review-pr', 'simplify', or fully qualified like 'gsd:new-project'." },
+      { "name": "args", "type": "string", "required": false, "description": "Optional arguments for the skill." }
+    ],
+    "examples": [
+      {
+        "title": "Create a git commit",
+        "description": "Invoke the commit skill to analyze changes and create a well-formatted commit.",
+        "code": "Skill({ skill: 'commit' })"
+      },
+      {
+        "title": "Review a pull request",
+        "description": "Review PR #42 using the review-pr skill.",
+        "code": "Skill({ skill: 'review-pr', args: '42' })"
+      },
+      {
+        "title": "Start a GSD project",
+        "description": "Initialize a new project using the GSD workflow skill.",
+        "code": "Skill({ skill: 'gsd:new-project', args: 'Build a REST API for user management' })"
+      }
+    ],
+    "tips": [
+      "Skills must be invoked BEFORE generating any other response — they are a blocking requirement.",
+      "Use the fully qualified name (e.g., 'gsd:plan-phase') for skills from specific packages.",
+      "Available skills are listed in system-reminder messages — check there for what's available in the current session."
+    ],
+    "related_tools": ["bash", "agent"]
+  },
+  {
+    "id": "web_fetch",
+    "name": "WebFetch",
+    "category": "web",
+    "icon": "Globe",
+    "description": "Fetches the content of a web page given a URL. Returns the page content for analysis. Useful for reading documentation, checking API responses, or retrieving reference material from the web.",
+    "when_to_use": "Use WebFetch when you have a specific URL and need to read its content — documentation pages, API references, blog posts, or any web resource the user points you to.",
+    "when_not_to_use": "Do not use WebFetch for searching the web — use WebSearch for that. Do not use it for URLs that require authentication or are behind paywalls.",
+    "parameters": [
+      { "name": "url", "type": "string", "required": true, "description": "The URL of the web page to fetch." }
+    ],
+    "examples": [
+      {
+        "title": "Read API documentation",
+        "description": "Fetch the documentation page for a library to understand its API.",
+        "code": "WebFetch({ url: 'https://tanstack.com/query/latest/docs/react/overview' })"
+      },
+      {
+        "title": "Check a GitHub issue",
+        "description": "Read the contents of a specific GitHub issue for context.",
+        "code": "WebFetch({ url: 'https://github.com/facebook/react/issues/12345' })"
+      }
+    ],
+    "tips": [
+      "Use WebSearch first to find the right URL, then WebFetch to read the full content.",
+      "The returned content is the page's text — JavaScript-rendered content may not be available."
+    ],
+    "related_tools": ["web_search"]
+  },
+  {
+    "id": "web_search",
+    "name": "WebSearch",
+    "category": "web",
+    "icon": "SearchCode",
+    "description": "Searches the web for information. Returns search results that can help answer questions about libraries, APIs, error messages, or any topic that benefits from current web knowledge.",
+    "when_to_use": "Use WebSearch when you need current information not in your training data — latest library versions, recent API changes, solutions to specific error messages, or documentation that may have been updated.",
+    "when_not_to_use": "Do not use WebSearch for information you already know confidently. Do not use it as a substitute for reading local project files — search the codebase first.",
+    "parameters": [
+      { "name": "query", "type": "string", "required": true, "description": "The search query string." }
+    ],
+    "examples": [
+      {
+        "title": "Find documentation",
+        "description": "Search for the latest Next.js app router documentation.",
+        "code": "WebSearch({ query: 'Next.js 14 app router migration guide' })"
+      },
+      {
+        "title": "Debug an error",
+        "description": "Search for solutions to a specific error message.",
+        "code": "WebSearch({ query: 'React hydration mismatch error server client content different' })"
+      }
+    ],
+    "tips": [
+      "Be specific in your queries — include library names, version numbers, and error codes for better results.",
+      "Follow up with WebFetch to read the full content of relevant results."
+    ],
+    "related_tools": ["web_fetch"]
+  },
+  {
+    "id": "task_create",
+    "name": "TaskCreate",
+    "category": "orchestration",
+    "icon": "ListPlus",
+    "description": "Creates a new background task that runs asynchronously. Tasks can perform long-running operations without blocking the conversation. Use TaskGet, TaskOutput, and TaskList to monitor and retrieve results.",
+    "when_to_use": "Use TaskCreate for long-running operations like test suites, builds, or data processing that you don't want to block on. Good for running multiple independent operations in parallel.",
+    "when_not_to_use": "Do not use tasks for quick operations that will complete in seconds — just run them directly with Bash. Don't create tasks if you need the result immediately for the next step.",
+    "parameters": [
+      { "name": "command", "type": "string", "required": true, "description": "The command or task description to execute." }
+    ],
+    "examples": [
+      {
+        "title": "Run tests in background",
+        "description": "Start a test suite as a background task while continuing other work.",
+        "code": "TaskCreate({ command: 'cd /project && npm run test:e2e' })"
+      },
+      {
+        "title": "Build project in background",
+        "description": "Kick off a production build as a background task.",
+        "code": "TaskCreate({ command: 'cd /project && npm run build' })"
+      }
+    ],
+    "tips": [
+      "After creating a task, use TaskGet to check its status and TaskOutput to read results.",
+      "Create multiple tasks in parallel for independent operations like linting, testing, and building simultaneously."
+    ],
+    "related_tools": ["task_get", "task_output", "task_list", "task_update", "task_stop"]
+  },
+  {
+    "id": "task_get",
+    "name": "TaskGet",
+    "category": "orchestration",
+    "icon": "ClipboardCheck",
+    "description": "Retrieves the current status of a background task by its ID. Returns information about whether the task is pending, running, completed, or failed.",
+    "when_to_use": "Use TaskGet to check on the status of a previously created background task before trying to read its output.",
+    "when_not_to_use": "Don't poll TaskGet in a tight loop — check once, and if not done, do other work first.",
+    "parameters": [
+      { "name": "task_id", "type": "string", "required": true, "description": "The ID of the task to check." }
+    ],
+    "examples": [
+      {
+        "title": "Check task status",
+        "description": "Check if a background test run has completed.",
+        "code": "TaskGet({ task_id: 'task_abc123' })"
+      }
+    ],
+    "tips": [
+      "Don't poll repeatedly — you'll be notified when background tasks complete.",
+      "Use TaskList to see all tasks if you've lost track of task IDs."
+    ],
+    "related_tools": ["task_create", "task_output", "task_list"]
+  },
+  {
+    "id": "task_list",
+    "name": "TaskList",
+    "category": "orchestration",
+    "icon": "List",
+    "description": "Lists all background tasks with their current statuses. Provides an overview of pending, running, completed, and failed tasks.",
+    "when_to_use": "Use TaskList to see all active and completed background tasks, especially when you need to find a task ID or check on multiple tasks at once.",
+    "when_not_to_use": "Don't use TaskList if you already know the specific task ID — use TaskGet instead for a single task.",
+    "parameters": [],
+    "examples": [
+      {
+        "title": "View all tasks",
+        "description": "List all background tasks and their statuses.",
+        "code": "TaskList()"
+      }
+    ],
+    "tips": [
+      "Use this to get an overview before deciding which task outputs to read.",
+      "Completed tasks remain in the list until the session ends."
+    ],
+    "related_tools": ["task_create", "task_get", "task_output"]
+  },
+  {
+    "id": "task_update",
+    "name": "TaskUpdate",
+    "category": "orchestration",
+    "icon": "RefreshCw",
+    "description": "Updates the status or metadata of an existing background task. Can be used to add notes, change priority, or modify task information.",
+    "when_to_use": "Use TaskUpdate when you need to annotate a task with additional information or update its metadata.",
+    "when_not_to_use": "Don't use TaskUpdate to stop a task — use TaskStop instead.",
+    "parameters": [
+      { "name": "task_id", "type": "string", "required": true, "description": "The ID of the task to update." },
+      { "name": "status", "type": "string", "required": false, "description": "New status for the task." }
+    ],
+    "examples": [
+      {
+        "title": "Update task status",
+        "description": "Mark a task with a note about its progress.",
+        "code": "TaskUpdate({ task_id: 'task_abc123', status: 'reviewing results' })"
+      }
+    ],
+    "tips": [
+      "Use meaningful status messages to track progress of long-running tasks.",
+      "TaskUpdate is for metadata changes — it doesn't affect the running process."
+    ],
+    "related_tools": ["task_create", "task_get", "task_stop"]
+  },
+  {
+    "id": "task_output",
+    "name": "TaskOutput",
+    "category": "orchestration",
+    "icon": "FileOutput",
+    "description": "Reads the output (stdout/stderr) of a background task. Use after a task completes to see its results, or while running to see partial output.",
+    "when_to_use": "Use TaskOutput to retrieve the results of a completed background task, or to check partial output of a running task.",
+    "when_not_to_use": "Check TaskGet first to confirm the task has completed before reading output. Don't read output in a tight loop.",
+    "parameters": [
+      { "name": "task_id", "type": "string", "required": true, "description": "The ID of the task whose output to read." }
+    ],
+    "examples": [
+      {
+        "title": "Read test results",
+        "description": "Get the output from a completed test run.",
+        "code": "TaskOutput({ task_id: 'task_abc123' })"
+      },
+      {
+        "title": "Check build output",
+        "description": "Read the build log to check for warnings or errors.",
+        "code": "TaskOutput({ task_id: 'task_build_456' })"
+      }
+    ],
+    "tips": [
+      "Always check task status with TaskGet before reading output to know if results are complete.",
+      "Output includes both stdout and stderr, so you'll see errors and warnings too."
+    ],
+    "related_tools": ["task_create", "task_get", "task_list"]
+  },
+  {
+    "id": "task_stop",
+    "name": "TaskStop",
+    "category": "orchestration",
+    "icon": "StopCircle",
+    "description": "Stops a running background task. Terminates the task's process and marks it as stopped.",
+    "when_to_use": "Use TaskStop when a background task is taking too long, producing errors, or is no longer needed.",
+    "when_not_to_use": "Don't stop tasks that are about to complete — let them finish. Don't stop tasks without checking their output first to understand what's happening.",
+    "parameters": [
+      { "name": "task_id", "type": "string", "required": true, "description": "The ID of the task to stop." }
+    ],
+    "examples": [
+      {
+        "title": "Stop a hanging test",
+        "description": "Stop a test suite that appears to be stuck in an infinite loop.",
+        "code": "TaskStop({ task_id: 'task_test_789' })"
+      }
+    ],
+    "tips": [
+      "Check TaskOutput first to see if the task is making progress before stopping it.",
+      "After stopping, you can still read the partial output with TaskOutput."
+    ],
+    "related_tools": ["task_create", "task_get", "task_output"]
+  },
+  {
+    "id": "cron_create",
+    "name": "CronCreate",
+    "category": "orchestration",
+    "icon": "Clock",
+    "description": "Creates a scheduled recurring task (cron job) that runs at specified intervals. The task will execute repeatedly according to the schedule until deleted.",
+    "when_to_use": "Use CronCreate for tasks that need to run periodically — health checks, scheduled builds, periodic cleanup, or recurring reports.",
+    "when_not_to_use": "Don't use cron for one-time tasks — use TaskCreate instead. Don't create cron jobs for very high-frequency intervals that could overwhelm the system.",
+    "parameters": [
+      { "name": "schedule", "type": "string", "required": true, "description": "Cron schedule expression (e.g., '*/5 * * * *' for every 5 minutes)." },
+      { "name": "command", "type": "string", "required": true, "description": "The command to execute on each run." }
+    ],
+    "examples": [
+      {
+        "title": "Health check every 5 minutes",
+        "description": "Create a cron job that checks if the dev server is responding.",
+        "code": "CronCreate({ schedule: '*/5 * * * *', command: 'curl -f http://localhost:3000/health || echo \"Server down!\"' })"
+      },
+      {
+        "title": "Run linter hourly",
+        "description": "Schedule hourly lint checks on the project.",
+        "code": "CronCreate({ schedule: '0 * * * *', command: 'cd /project && npm run lint' })"
+      }
+    ],
+    "tips": [
+      "Use CronList to verify your cron job was created correctly.",
+      "Remember to delete cron jobs when they're no longer needed with CronDelete."
+    ],
+    "related_tools": ["cron_delete", "cron_list", "task_create"]
+  },
+  {
+    "id": "cron_delete",
+    "name": "CronDelete",
+    "category": "orchestration",
+    "icon": "Trash2",
+    "description": "Deletes an existing cron job by its ID, stopping all future scheduled executions.",
+    "when_to_use": "Use CronDelete when a recurring task is no longer needed or when you want to stop a scheduled job.",
+    "when_not_to_use": "Make sure you're deleting the right cron job — use CronList first to verify the ID.",
+    "parameters": [
+      { "name": "cron_id", "type": "string", "required": true, "description": "The ID of the cron job to delete." }
+    ],
+    "examples": [
+      {
+        "title": "Remove a health check cron",
+        "description": "Delete a health check cron job that's no longer needed.",
+        "code": "CronDelete({ cron_id: 'cron_health_123' })"
+      }
+    ],
+    "tips": [
+      "Use CronList first to find the correct cron job ID.",
+      "Deletion is immediate — the cron job will not execute again."
+    ],
+    "related_tools": ["cron_create", "cron_list"]
+  },
+  {
+    "id": "cron_list",
+    "name": "CronList",
+    "category": "orchestration",
+    "icon": "CalendarClock",
+    "description": "Lists all active cron jobs with their schedules, commands, and IDs.",
+    "when_to_use": "Use CronList to see all scheduled recurring tasks, find cron job IDs for deletion, or verify that a cron job was created correctly.",
+    "when_not_to_use": "Don't confuse cron jobs with tasks — use TaskList for one-time background tasks.",
+    "parameters": [],
+    "examples": [
+      {
+        "title": "List all cron jobs",
+        "description": "View all scheduled recurring tasks.",
+        "code": "CronList()"
+      }
+    ],
+    "tips": [
+      "Check this regularly to ensure you don't have stale cron jobs running.",
+      "Each cron job has a unique ID that you'll need for CronDelete."
+    ],
+    "related_tools": ["cron_create", "cron_delete"]
+  },
+  {
+    "id": "lsp",
+    "name": "LSP",
+    "category": "system",
+    "icon": "Braces",
+    "description": "Language Server Protocol integration for code intelligence. Provides capabilities like go-to-definition, find references, hover information, completions, diagnostics, and symbol search powered by language servers.",
+    "when_to_use": "Use LSP for precise code navigation — finding where a function is defined, listing all references to a symbol, getting type information, or finding symbol definitions across the project. More precise than text-based search for code intelligence.",
+    "when_not_to_use": "Don't use LSP for general text search — use Grep instead. LSP requires a running language server, so it may not work for all file types or projects.",
+    "parameters": [
+      { "name": "action", "type": "string", "required": true, "description": "The LSP action: 'definition', 'references', 'hover', 'completions', 'diagnostics', 'symbols'." },
+      { "name": "file_path", "type": "string", "required": true, "description": "The file path for the LSP operation." },
+      { "name": "line", "type": "number", "required": false, "description": "Line number for position-based operations." },
+      { "name": "character", "type": "number", "required": false, "description": "Character/column number for position-based operations." },
+      { "name": "query", "type": "string", "required": false, "description": "Query string for symbol search." }
+    ],
+    "examples": [
+      {
+        "title": "Go to definition",
+        "description": "Find where a function is defined by clicking on its usage.",
+        "code": "LSP({ action: 'definition', file_path: '/project/src/app.ts', line: 15, character: 10 })"
+      },
+      {
+        "title": "Find all references",
+        "description": "Find every place a function is called across the project.",
+        "code": "LSP({ action: 'references', file_path: '/project/src/utils.ts', line: 5, character: 20 })"
+      },
+      {
+        "title": "Get hover information",
+        "description": "Get type information and documentation for a symbol.",
+        "code": "LSP({ action: 'hover', file_path: '/project/src/types.ts', line: 12, character: 8 })"
+      }
+    ],
+    "tips": [
+      "LSP provides more accurate results than text search for code navigation — it understands the language's semantics.",
+      "Use 'references' to safely rename or refactor — you'll know every place a symbol is used.",
+      "Not all projects have language servers configured — fall back to Grep if LSP isn't available."
+    ],
+    "related_tools": ["grep", "glob", "read"]
+  },
+  {
+    "id": "tool_search",
+    "name": "ToolSearch",
+    "category": "system",
+    "icon": "PackageSearch",
+    "description": "Searches and fetches full schema definitions for deferred tools. Deferred tools appear by name in system-reminder messages but can't be invoked until their full schema is fetched. Supports exact selection by name or keyword search.",
+    "when_to_use": "Use ToolSearch when you see a deferred tool listed in a system-reminder that you need to invoke. You must fetch its schema before you can call it.",
+    "when_not_to_use": "Don't use ToolSearch for tools that are already fully defined in your tool list. Only needed for deferred tools.",
+    "parameters": [
+      { "name": "query", "type": "string", "required": true, "description": "Query to find deferred tools. Use 'select:<tool_name>' for direct selection, or keywords to search." },
+      { "name": "max_results", "type": "number", "required": false, "description": "Maximum number of results to return. Default: 5." }
+    ],
+    "examples": [
+      {
+        "title": "Fetch specific tools by name",
+        "description": "Fetch the schemas for WebFetch and WebSearch tools.",
+        "code": "ToolSearch({ query: 'select:WebFetch,WebSearch' })"
+      },
+      {
+        "title": "Search for MCP tools",
+        "description": "Find all available MCP-related tools by keyword.",
+        "code": "ToolSearch({ query: 'mcp', max_results: 10 })"
+      }
+    ],
+    "tips": [
+      "Use 'select:ToolName' for exact matches when you know the tool name from the system reminder.",
+      "Use keyword search when you're not sure of the exact tool name.",
+      "Once a tool's schema is fetched, it becomes callable like any other tool in the session."
+    ],
+    "related_tools": ["list_mcp_resources", "read_mcp_resource"]
+  },
+  {
+    "id": "list_mcp_resources",
+    "name": "ListMcpResourcesTool",
+    "category": "system",
+    "icon": "Database",
+    "description": "Lists available MCP (Model Context Protocol) resources. MCP servers can expose various resources like database connections, API endpoints, file systems, or custom data sources.",
+    "when_to_use": "Use ListMcpResourcesTool to discover what MCP resources are available in the current session before attempting to read from them.",
+    "when_not_to_use": "Don't use this if you already know the specific resource URI — go directly to ReadMcpResourceTool.",
+    "parameters": [],
+    "examples": [
+      {
+        "title": "Discover available resources",
+        "description": "List all MCP resources available in the current session.",
+        "code": "ListMcpResourcesTool()"
+      }
+    ],
+    "tips": [
+      "MCP resources depend on which MCP servers are configured — different projects may have different resources.",
+      "Use this as a discovery step before ReadMcpResourceTool."
+    ],
+    "related_tools": ["read_mcp_resource", "tool_search"]
+  },
+  {
+    "id": "read_mcp_resource",
+    "name": "ReadMcpResourceTool",
+    "category": "system",
+    "icon": "DatabaseZap",
+    "description": "Reads the content of a specific MCP resource by its URI. Can retrieve data from various MCP-connected sources like databases, APIs, or file systems.",
+    "when_to_use": "Use ReadMcpResourceTool when you need to read data from a specific MCP resource that you've discovered via ListMcpResourcesTool.",
+    "when_not_to_use": "Don't use this without first discovering available resources with ListMcpResourcesTool. The URI must be valid and the resource must be accessible.",
+    "parameters": [
+      { "name": "uri", "type": "string", "required": true, "description": "The URI of the MCP resource to read." }
+    ],
+    "examples": [
+      {
+        "title": "Read an MCP resource",
+        "description": "Read data from a specific MCP resource.",
+        "code": "ReadMcpResourceTool({ uri: 'mcp://server/resource-name' })"
+      }
+    ],
+    "tips": [
+      "Always use ListMcpResourcesTool first to discover valid resource URIs.",
+      "MCP resources can return various data types — the content format depends on the MCP server implementation."
+    ],
+    "related_tools": ["list_mcp_resources", "tool_search"]
+  },
+  {
+    "id": "enter_plan_mode",
+    "name": "EnterPlanMode",
+    "category": "orchestration",
+    "icon": "Map",
+    "description": "Enters planning mode, which restricts the agent to read-only operations. In plan mode, the agent can explore, analyze, and create a plan but cannot make changes to files or execute destructive commands. Useful for thinking through complex problems before acting.",
+    "when_to_use": "Use EnterPlanMode when you need to analyze a complex problem, create a detailed plan before implementation, or when the user explicitly asks to plan before acting. Also toggled via Shift+Tab.",
+    "when_not_to_use": "Don't enter plan mode for simple, straightforward tasks that can be executed directly. Don't stay in plan mode when it's time to implement.",
+    "parameters": [],
+    "examples": [
+      {
+        "title": "Plan a refactoring",
+        "description": "Enter plan mode to analyze the codebase before making changes.",
+        "code": "EnterPlanMode()"
+      },
+      {
+        "title": "Analyze before acting",
+        "description": "Plan mode allows thorough exploration without risk of changes.",
+        "code": "EnterPlanMode()\n// Now explore, read files, search — but no writes or destructive commands"
+      }
+    ],
+    "tips": [
+      "Plan mode is great for complex refactors — understand the full scope before making any changes.",
+      "Users can toggle plan/act mode with Shift+Tab from the input.",
+      "Exit plan mode with ExitPlanMode when you're ready to implement."
+    ],
+    "related_tools": ["exit_plan_mode", "agent"]
+  },
+  {
+    "id": "exit_plan_mode",
+    "name": "ExitPlanMode",
+    "category": "orchestration",
+    "icon": "MapPinOff",
+    "description": "Exits planning mode and returns to normal (act) mode where the agent can make changes to files and execute all commands.",
+    "when_to_use": "Use ExitPlanMode when planning is complete and you're ready to implement the changes.",
+    "when_not_to_use": "Don't exit plan mode prematurely — make sure the plan is complete and the user is ready for implementation.",
+    "parameters": [],
+    "examples": [
+      {
+        "title": "Switch to implementation",
+        "description": "Exit plan mode after creating a thorough plan.",
+        "code": "ExitPlanMode()\n// Now proceed with implementation"
+      }
+    ],
+    "tips": [
+      "Review the plan with the user before exiting plan mode to ensure alignment.",
+      "After exiting, you'll have full read-write access to implement the plan."
+    ],
+    "related_tools": ["enter_plan_mode"]
+  },
+  {
+    "id": "enter_worktree",
+    "name": "EnterWorktree",
+    "category": "system",
+    "icon": "GitBranch",
+    "description": "Creates an isolated git worktree for safe experimentation. A worktree is a separate working directory linked to the same repository, allowing you to make changes without affecting the main working directory. Changes can be merged back or discarded.",
+    "when_to_use": "Use EnterWorktree for risky experiments, trying alternative approaches, or making changes that you might want to discard. Great for A/B testing different implementations.",
+    "when_not_to_use": "Don't use worktrees for simple, safe changes. Worktrees add overhead — only use them when isolation is genuinely valuable.",
+    "parameters": [],
+    "examples": [
+      {
+        "title": "Experiment safely",
+        "description": "Create a worktree to try a risky refactoring without affecting the main branch.",
+        "code": "EnterWorktree()\n// Make experimental changes safely\n// If they work, merge back; if not, discard"
+      },
+      {
+        "title": "Test alternative approach",
+        "description": "Use a worktree to try a different implementation approach.",
+        "code": "EnterWorktree()\n// Try approach B while approach A remains untouched in the main worktree"
+      }
+    ],
+    "tips": [
+      "Worktrees share the same git history but have independent working directories.",
+      "Use ExitWorktree to clean up when done — don't leave worktrees lingering.",
+      "Agent tool can also be configured to run in a worktree for sub-agent isolation."
+    ],
+    "related_tools": ["exit_worktree", "agent"]
+  },
+  {
+    "id": "exit_worktree",
+    "name": "ExitWorktree",
+    "category": "system",
+    "icon": "GitMerge",
+    "description": "Exits and cleans up the current git worktree. Returns to the main working directory. Changes made in the worktree can be committed before exiting to preserve them, or discarded.",
+    "when_to_use": "Use ExitWorktree when you're done with an experimental worktree — either after committing successful changes or after deciding to discard them.",
+    "when_not_to_use": "Don't exit a worktree without first deciding what to do with the changes — commit them if they're valuable.",
+    "parameters": [],
+    "examples": [
+      {
+        "title": "Clean up after experiment",
+        "description": "Exit and clean up the worktree after completing or abandoning an experiment.",
+        "code": "ExitWorktree()"
+      }
+    ],
+    "tips": [
+      "Commit any valuable changes before exiting — uncommitted changes in the worktree will be lost.",
+      "After exiting, you're back in the main working directory."
+    ],
+    "related_tools": ["enter_worktree"]
+  },
+  {
+    "id": "notebook_edit",
+    "name": "NotebookEdit",
+    "category": "file-ops",
+    "icon": "BookOpen",
+    "description": "Edits Jupyter notebook (.ipynb) cells. Allows you to modify, add, or delete cells in a notebook without having to rewrite the entire notebook file. Supports code cells, markdown cells, and raw cells.",
+    "when_to_use": "Use NotebookEdit when you need to modify specific cells in a Jupyter notebook. More precise than using Write to overwrite the entire notebook file.",
+    "when_not_to_use": "Don't use NotebookEdit for non-notebook files. For reading notebook contents, use Read instead.",
+    "parameters": [
+      { "name": "file_path", "type": "string", "required": true, "description": "The absolute path to the .ipynb notebook file." },
+      { "name": "cell_index", "type": "number", "required": true, "description": "The index of the cell to edit (0-based)." },
+      { "name": "action", "type": "string", "required": true, "description": "The action to perform: 'edit', 'add', or 'delete'." },
+      { "name": "content", "type": "string", "required": false, "description": "The new content for the cell. Required for 'edit' and 'add' actions." },
+      { "name": "cell_type", "type": "string", "required": false, "description": "The cell type: 'code', 'markdown', or 'raw'. Required for 'add' action." }
+    ],
+    "examples": [
+      {
+        "title": "Edit a code cell",
+        "description": "Modify the code in the third cell of a notebook.",
+        "code": "NotebookEdit({ file_path: '/project/analysis.ipynb', cell_index: 2, action: 'edit', content: 'import pandas as pd\\ndf = pd.read_csv(\"data.csv\")\\ndf.head()' })"
+      },
+      {
+        "title": "Add a markdown cell",
+        "description": "Insert a new markdown cell at position 0.",
+        "code": "NotebookEdit({ file_path: '/project/analysis.ipynb', cell_index: 0, action: 'add', content: '# Data Analysis\\nThis notebook explores the dataset.', cell_type: 'markdown' })"
+      },
+      {
+        "title": "Delete a cell",
+        "description": "Remove a cell that is no longer needed.",
+        "code": "NotebookEdit({ file_path: '/project/analysis.ipynb', cell_index: 5, action: 'delete' })"
+      }
+    ],
+    "tips": [
+      "Read the notebook first with Read to see cell indices and current content.",
+      "Cell indices are 0-based — the first cell is index 0.",
+      "Adding a cell inserts it at the specified index, pushing subsequent cells down."
+    ],
+    "related_tools": ["read", "edit", "write"]
+  },
+  {
+    "id": "ask_user_question",
+    "name": "AskUserQuestion",
+    "category": "system",
+    "icon": "MessageCircleQuestion",
+    "description": "Prompts the user for input when the agent needs clarification, a decision, or additional information to proceed. Pauses execution until the user responds.",
+    "when_to_use": "Use AskUserQuestion when you need clarification that can't be inferred from context — ambiguous requirements, choice between multiple valid approaches, or missing information that's essential to proceed correctly.",
+    "when_not_to_use": "Don't ask unnecessary questions that you can answer yourself with reasonable assumptions. Don't ask multiple questions when you could make progress and ask later. Prefer action over asking when the intent is clear.",
+    "parameters": [
+      { "name": "question", "type": "string", "required": true, "description": "The question to ask the user." }
+    ],
+    "examples": [
+      {
+        "title": "Clarify requirements",
+        "description": "Ask the user to choose between two valid approaches.",
+        "code": "AskUserQuestion({ question: 'Should I implement this as a REST API or GraphQL? The project currently uses both patterns.' })"
+      },
+      {
+        "title": "Get missing information",
+        "description": "Ask for a required piece of information that can't be inferred.",
+        "code": "AskUserQuestion({ question: 'What database connection string should I use for the new staging environment?' })"
+      }
+    ],
+    "tips": [
+      "Be specific in your questions — provide context and options when possible.",
+      "Batch related questions into a single ask rather than asking one at a time.",
+      "Only ask when truly necessary — unnecessary questions slow down the workflow."
+    ],
+    "related_tools": ["enter_plan_mode"]
+  }
+]

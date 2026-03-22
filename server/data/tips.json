@@ -1,0 +1,142 @@
+[
+  {
+    "id": "context-management",
+    "title": "Managing Context Window Effectively",
+    "category": "context",
+    "content": "Claude Code has a large but finite context window. To use it effectively:\n\n- **Be selective with file reads**: Use `offset` and `limit` on Read for large files. Don't read entire files when you only need a section.\n- **Use Grep before Read**: Find the right files with Grep, then Read only the relevant ones.\n- **Compact regularly**: Use `/compact` when the conversation gets long to summarize and free up context.\n- **Start new conversations**: For unrelated tasks, start a fresh conversation rather than continuing a long one.\n- **Reference files with @**: Use `@filename` to include file contents efficiently — Claude reads them automatically.\n\nThe context window includes everything: system prompts, CLAUDE.md, conversation history, tool results, and your messages. Be mindful of what's consuming space.",
+    "priority": 5
+  },
+  {
+    "id": "claude-md-best-practices",
+    "title": "CLAUDE.md Best Practices",
+    "category": "config",
+    "content": "CLAUDE.md is your project's instruction file — Claude reads it at the start of every conversation. Make it count:\n\n- **Project overview**: Brief description of what the project is and its tech stack.\n- **Key conventions**: Naming conventions, file organization patterns, preferred libraries.\n- **Build/test commands**: How to build, test, lint, and run the project.\n- **Important rules**: Things Claude should always or never do in this project.\n- **Architecture notes**: Key architectural decisions and why they were made.\n\nKeep it concise — everything in CLAUDE.md consumes context window. Put detailed docs in separate files and reference them.\n\nYou can have CLAUDE.md files at multiple levels:\n- `~/.claude/CLAUDE.md` — global, applies to all projects\n- `/project/CLAUDE.md` — project root, applies to the project\n- `/project/src/CLAUDE.md` — directory-specific, applies when working in that directory",
+    "priority": 5
+  },
+  {
+    "id": "memory-system",
+    "title": "Using Claude's Memory System",
+    "category": "config",
+    "content": "Claude Code has a memory system that persists information across conversations:\n\n- **Auto-memory**: Claude stores useful context in `~/.claude/projects/<project>/memory/` as markdown files.\n- **Memory index**: A `MEMORY.md` file indexes all memory files with descriptions.\n- **Project memory**: Specific to each project directory — different projects have separate memories.\n- **User memory**: Global preferences stored at the user level.\n\nTo leverage memory effectively:\n- Let Claude save important decisions and preferences automatically.\n- You can manually edit memory files to correct or add information.\n- Reference memory in your prompts: \"Remember that we decided to use...\" — Claude will check its memory.\n- Clear outdated memory when project direction changes significantly.",
+    "priority": 4
+  },
+  {
+    "id": "mcp-servers",
+    "title": "MCP Servers: Extending Claude's Capabilities",
+    "category": "advanced",
+    "content": "Model Context Protocol (MCP) servers extend Claude Code with custom tools and data sources:\n\n- **Built-in MCP tools**: GitHub operations, database queries, and more are available via MCP.\n- **Configuration**: MCP servers are configured in `.claude/settings.json` at project or user level.\n- **Deferred tools**: MCP tools appear as deferred — use `ToolSearch` to fetch their schemas before calling them.\n- **Custom servers**: You can build custom MCP servers to give Claude access to your specific tools and data.\n\nCommon MCP integrations:\n- **GitHub**: Create PRs, issues, review code directly through Claude.\n- **PostgreSQL**: Query databases directly for debugging or analysis.\n- **Custom APIs**: Build MCP servers that wrap your internal APIs.\n\nMCP tools show up in system-reminder messages when available in a session.",
+    "priority": 3
+  },
+  {
+    "id": "hooks-system",
+    "title": "Hooks: Automating Before and After Actions",
+    "category": "config",
+    "content": "Claude Code supports hooks that run automatically before or after certain actions:\n\n- **Pre-commit hooks**: Run linting, formatting, or validation before commits.\n- **Post-tool hooks**: Run actions after specific tools execute.\n- **Custom hooks**: Define your own hooks for project-specific workflows.\n\nConfigure hooks via `/update-config` or directly in settings files. Common uses:\n- Auto-format code after every Edit or Write operation.\n- Run type-checking before commits.\n- Auto-restart dev server after config changes.\n- Validate test coverage before allowing commits.\n\nHooks should be fast — slow hooks will make the workflow feel sluggish.",
+    "priority": 3
+  },
+  {
+    "id": "permission-modes",
+    "title": "Permission Modes: Balancing Speed and Safety",
+    "category": "config",
+    "content": "Claude Code has permission modes that control what actions require user approval:\n\n- **Ask mode** (default): Claude asks for permission before file writes, command execution, and other side effects.\n- **Auto-accept mode**: Automatically approves safe operations. Configure which operations are auto-approved.\n- **Plan mode**: Read-only — Claude can explore and plan but not make changes. Toggle with Shift+Tab.\n\nFor experienced users, auto-accept mode with a well-configured allowlist dramatically speeds up workflows. You can auto-approve:\n- File edits in specific directories\n- Specific shell commands (npm test, git status, etc.)\n- Read operations (always safe)\n\nKeep destructive operations (git push, rm, database writes) on manual approval.",
+    "priority": 4
+  },
+  {
+    "id": "agent-delegation",
+    "title": "Delegating Work to Sub-Agents",
+    "category": "advanced",
+    "content": "The Agent tool lets you spawn sub-agents for parallel or isolated work:\n\n**When to delegate:**\n- Exploring multiple code paths simultaneously\n- Running experiments in isolation (worktree agents)\n- Long-running research while you continue working\n- Tasks that are independent and can run in parallel\n\n**Best practices:**\n- Give agents focused, specific tasks — not vague directives.\n- Use 2-3 parallel agents rather than 1 overloaded agent.\n- Background agents for long tasks, foreground for quick ones.\n- Worktree agents for risky experiments that might break things.\n\n**Example workflow:**\n1. Spawn an explore agent to understand the auth module.\n2. Spawn another to understand the database schema.\n3. Once both complete, use their findings to plan your implementation.",
+    "priority": 3
+  },
+  {
+    "id": "file-references",
+    "title": "Using @ File References Effectively",
+    "category": "workflow",
+    "content": "The `@` syntax is one of Claude Code's most powerful features:\n\n- **@filename**: Reference a file to include its contents in context automatically.\n- **Autocomplete**: After typing @, you get a dropdown of matching files.\n- **Multiple files**: Reference several files in one prompt: `@src/auth.ts @src/middleware.ts`\n- **Directories**: Some implementations support `@src/` to reference a directory.\n\n**When to use @:**\n- When you want Claude to see the current state of a file without a separate Read call.\n- When asking Claude to modify a file — @reference ensures it has the latest content.\n- When comparing files — reference both in your prompt.\n\n**Tip**: Use @ references instead of pasting code — it's more efficient and ensures Claude sees the actual file, not an outdated copy.",
+    "priority": 4
+  },
+  {
+    "id": "effective-prompting",
+    "title": "Writing Effective Prompts for Claude Code",
+    "category": "prompting",
+    "content": "The way you prompt Claude Code significantly affects output quality:\n\n**Be specific:**\n- Bad: \"Fix the bug\"\n- Good: \"Fix the login redirect loop in src/auth/callback.ts — users get stuck after OAuth callback\"\n\n**Provide context:**\n- Mention relevant files, components, or modules.\n- Describe the expected behavior vs actual behavior.\n- Include error messages or stack traces.\n\n**Set constraints:**\n- \"Use the existing pattern in src/api/users.ts as a reference\"\n- \"Don't modify the database schema\"\n- \"Keep the changes backward compatible\"\n\n**Ask for what you want:**\n- \"Explain your reasoning before making changes\"\n- \"Show me the plan before implementing\"\n- \"Make the minimal change necessary\"\n\n**One thing at a time:**\n- Break complex tasks into steps rather than asking for everything at once.\n- Each focused request gets better results than one massive request.",
+    "priority": 5
+  },
+  {
+    "id": "plan-mode-usage",
+    "title": "When to Use Plan Mode",
+    "category": "workflow",
+    "content": "Plan mode (Shift+Tab) restricts Claude to read-only operations — perfect for:\n\n**Use Plan mode when:**\n- Starting a complex task — understand before you act.\n- Investigating a bug — explore without accidentally changing things.\n- Reviewing architecture — analyze without modifying.\n- Learning a codebase — safe exploration.\n- You want a plan before implementation.\n\n**Plan mode workflow:**\n1. Enter Plan mode (Shift+Tab)\n2. Ask Claude to explore, analyze, and create a plan\n3. Review the plan and ask clarifying questions\n4. Exit Plan mode (Shift+Tab again)\n5. Say \"Execute the plan\" to implement\n\n**Tip**: Plan mode is especially valuable for large refactors where making changes without understanding the full scope could create problems.",
+    "priority": 4
+  },
+  {
+    "id": "worktree-isolation",
+    "title": "Git Worktree Isolation for Safe Experiments",
+    "category": "advanced",
+    "content": "Worktrees give you isolated working directories linked to the same repo:\n\n**What worktrees do:**\n- Create a separate directory with its own working tree.\n- Share the same git history and branches.\n- Changes in the worktree don't affect your main directory.\n- Can be committed, merged, or discarded.\n\n**When to use worktrees:**\n- Trying a risky refactoring approach.\n- A/B testing two different implementations.\n- Running a potentially breaking experiment.\n- Working on a feature while keeping main directory clean.\n\n**How to use:**\n- Use `EnterWorktree` tool or Agent with `worktree: true`.\n- Make changes and test in isolation.\n- If changes work, commit and merge. If not, discard.\n- Always `ExitWorktree` to clean up.\n\nWorktrees are the safety net that makes bold experiments free.",
+    "priority": 3
+  },
+  {
+    "id": "background-tasks",
+    "title": "Running Background Tasks Effectively",
+    "category": "workflow",
+    "content": "Background tasks let you do multiple things simultaneously:\n\n**Starting background tasks:**\n- `Bash` with `run_in_background: true` — for shell commands.\n- `TaskCreate` — for tracked background tasks.\n- `Agent` with `run_in_background: true` — for background agents.\n\n**Common background uses:**\n- Running test suites while continuing development.\n- Starting dev servers.\n- Building the project while working on other files.\n- Running lint/format across the entire codebase.\n\n**Monitoring:**\n- You get notified when background tasks complete.\n- Use `TaskGet` to check status, `TaskOutput` to read results.\n- Use `TaskList` to see all active tasks.\n\n**Tip**: Don't poll for task completion with sleep loops — you'll be notified automatically. Just continue working and check results when notified.",
+    "priority": 3
+  },
+  {
+    "id": "slash-commands",
+    "title": "Mastering Slash Commands",
+    "category": "workflow",
+    "content": "Slash commands (skills) are pre-built workflows for common tasks:\n\n**Essential commands:**\n- `/commit` — create well-formatted git commits.\n- `/review-pr` — thorough pull request reviews.\n- `/simplify` — code quality review and simplification.\n- `/loop` — run a command repeatedly, fixing issues until it passes.\n\n**Built-in commands:**\n- `/help` — show available commands and help.\n- `/clear` — clear the conversation.\n- `/compact` — summarize and compress the conversation.\n- `/status` — show current session status.\n\n**Tips:**\n- Type `/` to see all available commands.\n- Commands can accept arguments: `/review-pr 42`.\n- Installed skills (like GSD) add their own slash commands.\n- You can also trigger skills with natural language — \"commit my changes\" invokes /commit.",
+    "priority": 4
+  },
+  {
+    "id": "custom-keybindings",
+    "title": "Customizing Keybindings",
+    "category": "config",
+    "content": "Claude Code's keyboard shortcuts can be customized:\n\n**Default shortcuts to know:**\n- `Shift+Enter` — newline in input.\n- `Shift+Tab` — toggle plan/act mode.\n- `Escape Escape` — undo last code change.\n- `Ctrl+C` — cancel generation.\n- `Ctrl+L` — clear conversation.\n- `Up Arrow` — cycle input history.\n\n**Customization:**\n- Use `/keybindings-help` to see all shortcuts.\n- Custom keybindings can be configured for frequently used actions.\n- Keybindings can vary by context (input, conversation, generation).\n\n**Tip**: Learning the shortcuts for mode switching (Shift+Tab) and history navigation (Up Arrow) will significantly speed up your workflow.",
+    "priority": 2
+  },
+  {
+    "id": "project-setup",
+    "title": "Setting Up a Project for Claude Code",
+    "category": "config",
+    "content": "Proper project setup makes Claude Code dramatically more effective:\n\n**Essential setup:**\n1. Create `CLAUDE.md` in the project root with tech stack, conventions, and key commands.\n2. Ensure `package.json` (or equivalent) has accurate scripts for build, test, lint, dev.\n3. Have a `.gitignore` that excludes build artifacts, node_modules, and secrets.\n\n**Recommended setup:**\n- Configure MCP servers for your tools (GitHub, databases, etc.).\n- Set up permission auto-approvals for common safe operations.\n- Create directory-level CLAUDE.md files for complex sub-projects.\n- Configure hooks for auto-formatting or auto-testing.\n\n**What to include in CLAUDE.md:**\n```\n# Project: MyApp\nTech: Next.js 14, TypeScript, Prisma, PostgreSQL\n\n## Commands\n- `npm run dev` — start dev server\n- `npm test` — run tests\n- `npm run lint` — run linter\n\n## Conventions\n- Use server components by default\n- API routes in /app/api/\n- Zod for validation\n```",
+    "priority": 5
+  },
+  {
+    "id": "git-workflows",
+    "title": "Git Workflows with Claude Code",
+    "category": "workflow",
+    "content": "Claude Code excels at git operations — here's how to use it effectively:\n\n**Committing:**\n- Use `/commit` for well-formatted commits that match your project's style.\n- Claude analyzes the diff and writes meaningful commit messages.\n- Sensitive files (.env, credentials) are flagged before committing.\n\n**Pull Requests:**\n- Use `/review-pr` for thorough code reviews.\n- Ask Claude to create PRs with `gh pr create` — it generates good descriptions.\n- Claude checks ALL commits in a PR, not just the latest.\n\n**Branching:**\n- Ask Claude to create feature branches before starting work.\n- Use worktrees for experimental branches.\n\n**Safety:**\n- Claude never force-pushes to main/master.\n- Destructive git operations require explicit user approval.\n- Pre-commit hooks are always respected.\n\n**Tip**: Let Claude handle git operations — it's careful about safety and produces clean history.",
+    "priority": 4
+  },
+  {
+    "id": "tdd-with-claude",
+    "title": "Test-Driven Development with Claude",
+    "category": "workflow",
+    "content": "Claude Code is excellent for TDD workflows:\n\n**TDD flow:**\n1. Write a failing test (or ask Claude to write it from requirements).\n2. Use `/loop npm test` to run tests in a loop.\n3. Claude implements code to make the test pass.\n4. Claude automatically refactors while keeping tests green.\n\n**Effective TDD prompting:**\n- \"Write a failing test for [feature], then implement it.\"\n- \"Here's my test — make it pass with the simplest implementation.\"\n- \"The tests pass, now refactor the implementation without breaking them.\"\n\n**Tips:**\n- Start with the simplest test case, then add complexity.\n- Let Claude generate edge case tests after the happy path works.\n- Use `/loop` to automate the red-green-refactor cycle.\n- Tests serve as specification — be precise about expected behavior.",
+    "priority": 3
+  },
+  {
+    "id": "large-codebase-strategies",
+    "title": "Strategies for Large Codebases",
+    "category": "performance",
+    "content": "Large codebases need different strategies than small projects:\n\n**Navigation:**\n- Use Grep with type/glob filters to narrow searches.\n- Use Glob to find files by pattern rather than browsing directories.\n- Read specific sections of large files with offset/limit.\n- Use @ references for files you're working with.\n\n**Context management:**\n- Don't try to read the entire codebase — be surgical.\n- Use `/compact` frequently to free up context.\n- Start new conversations for unrelated tasks.\n- Use CLAUDE.md to give Claude architectural context without reading everything.\n\n**Exploration:**\n- Use Agent with type 'explore' for codebase mapping.\n- Start broad (directory structure) then narrow to specific areas.\n- Use LSP for precise code navigation (go-to-definition, find-references).\n\n**Editing:**\n- Make changes in small, focused batches.\n- Test after each batch of changes.\n- Use worktrees for large refactors that touch many files.",
+    "priority": 4
+  },
+  {
+    "id": "multi-file-edits",
+    "title": "Making Multi-File Edits Safely",
+    "category": "workflow",
+    "content": "When a change spans multiple files, careful coordination is essential:\n\n**Strategy:**\n1. Plan the change in Plan mode first — identify ALL files that need to change.\n2. Make changes in dependency order — types/interfaces first, then implementations, then consumers.\n3. Run tests after each logically complete set of changes.\n\n**Best practices:**\n- Use Grep to find all places that reference what you're changing.\n- Update imports and type definitions before updating implementation.\n- Check for string references (error messages, logs) that might need updating.\n- Run the full test suite after completing all changes.\n\n**Common pitfalls:**\n- Forgetting to update tests when changing function signatures.\n- Missing string-based references (dynamic imports, config references).\n- Not updating re-exports in index files.\n\n**Tip**: Ask Claude to \"find all files that need to change for [your modification]\" before making any edits — this prevents partial migrations.",
+    "priority": 4
+  },
+  {
+    "id": "provider-agnostic",
+    "title": "Claude Code with Different Providers",
+    "category": "advanced",
+    "content": "Claude Code can work with different AI providers and model configurations:\n\n- **Default**: Uses Anthropic's Claude API directly.\n- **AWS Bedrock**: Can be configured to use Claude via AWS Bedrock.\n- **Google Vertex AI**: Supports Claude via Google Vertex.\n- **API keys**: Configure via environment variables or settings.\n\n**Model selection:**\n- Different tasks may benefit from different models.\n- Larger context models handle bigger codebases better.\n- Faster models are better for quick iterations.\n\n**Cost management:**\n- Be mindful of context window usage — large contexts cost more.\n- Use `/compact` to reduce ongoing costs in long conversations.\n- Background agents consume tokens independently.\n\n**Tip**: For cost-sensitive workflows, use smaller context operations (targeted Grep + Read) rather than loading entire files into context.",
+    "priority": 2
+  }
+]

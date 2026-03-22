@@ -1,0 +1,465 @@
+[
+  {
+    "id": "debug-trace-bug",
+    "title": "Trace Bug to Root Cause",
+    "category": "debug",
+    "description": "When you have a bug with a known symptom but unknown cause. Systematically traces the issue through the codebase to find the root cause.",
+    "template": "I'm seeing this bug: {{bug_description}}\n\nThe symptom appears in {{location}}.\n\nPlease trace through the code to find the root cause:\n1. Start from where the symptom appears\n2. Follow the data/control flow backwards\n3. Identify where the actual problem originates\n4. Suggest a fix with explanation of why it works",
+    "variables": [
+      { "name": "bug_description", "description": "Clear description of the bug symptoms", "example": "Users see a blank page after login on mobile devices" },
+      { "name": "location", "description": "Where the symptom appears (file, component, endpoint)", "example": "the Dashboard component at src/pages/Dashboard.tsx" }
+    ],
+    "tips": [
+      "Include any error messages or stack traces you have — they dramatically speed up the trace.",
+      "Mention if the bug is intermittent or consistent, and any conditions that trigger it."
+    ],
+    "tags": ["debug", "root-cause", "trace"]
+  },
+  {
+    "id": "debug-binary-search",
+    "title": "Binary Search for Regression",
+    "category": "debug",
+    "description": "When something that used to work is now broken. Uses git history to find the exact commit that introduced the regression.",
+    "template": "Something broke that was working before: {{what_broke}}\n\nIt was last known working around {{timeframe_or_commit}}.\n\nHelp me find the regression:\n1. Check git log for relevant commits in the affected area ({{affected_files}})\n2. Identify suspicious commits that could have caused this\n3. Analyze the diff of the most likely commit\n4. Confirm the root cause and suggest a fix",
+    "variables": [
+      { "name": "what_broke", "description": "Description of the broken functionality", "example": "File upload no longer shows progress percentage" },
+      { "name": "timeframe_or_commit", "description": "When it was last working", "example": "2 days ago / commit abc1234" },
+      { "name": "affected_files", "description": "Files or area likely involved", "example": "src/components/FileUpload.tsx and src/hooks/useUpload.ts" }
+    ],
+    "tips": [
+      "If you know the last working commit, provide it — it narrows the search significantly.",
+      "The more specific you are about what broke, the faster the search."
+    ],
+    "tags": ["debug", "regression", "git", "bisect"]
+  },
+  {
+    "id": "debug-log-based",
+    "title": "Log-Based Debugging",
+    "category": "debug",
+    "description": "When you need to understand the runtime behavior of code. Adds strategic logging to trace execution flow and data transformations.",
+    "template": "I need to understand what's happening at runtime in {{code_area}}.\n\nThe expected behavior is: {{expected}}\nThe actual behavior is: {{actual}}\n\nPlease add strategic logging/debug statements to trace:\n1. Input values at entry points\n2. Key decision points and branch conditions\n3. Data transformations and intermediate values\n4. Output values at exit points\n\nUse {{logging_method}} for the logs.",
+    "variables": [
+      { "name": "code_area", "description": "The area of code to instrument", "example": "the payment processing pipeline in src/services/payment.ts" },
+      { "name": "expected", "description": "What should happen", "example": "Order total should include tax and discount" },
+      { "name": "actual", "description": "What actually happens", "example": "Discount is applied twice, resulting in incorrect total" },
+      { "name": "logging_method", "description": "How to log", "example": "console.log with [DEBUG] prefix" }
+    ],
+    "tips": [
+      "Remember to remove debug logs after finding the issue — or use a proper logger with levels.",
+      "Focus logging on the data flow, not just control flow."
+    ],
+    "tags": ["debug", "logging", "runtime", "trace"]
+  },
+  {
+    "id": "debug-reproduce",
+    "title": "Reproduce an Issue",
+    "category": "debug",
+    "description": "When you have a bug report but can't reliably reproduce it. Creates a systematic reproduction plan.",
+    "template": "I received this bug report:\n{{bug_report}}\n\nEnvironment: {{environment}}\n\nPlease help me reproduce this:\n1. Analyze the report to identify the key conditions\n2. Look at the relevant code to understand possible triggers\n3. Create a step-by-step reproduction scenario\n4. If possible, write a failing test that captures the bug",
+    "variables": [
+      { "name": "bug_report", "description": "The original bug report or description", "example": "User reports that clicking 'Save' sometimes loses their changes when they have multiple tabs open" },
+      { "name": "environment", "description": "Environment details", "example": "Chrome on macOS, React 18, Next.js 14" }
+    ],
+    "tips": [
+      "Include all details from the bug report, even ones that seem irrelevant.",
+      "Race conditions and timing-dependent bugs often need specific conditions to reproduce."
+    ],
+    "tags": ["debug", "reproduce", "testing", "bug-report"]
+  },
+  {
+    "id": "refactor-extract-function",
+    "title": "Extract Function / Component",
+    "category": "refactor",
+    "description": "When a function or component is too large or has distinct responsibilities that should be separated.",
+    "template": "The {{type}} at {{location}} is too large/complex and should be broken down.\n\nPlease:\n1. Identify logical sections that can be extracted\n2. Extract them into well-named {{type}}s\n3. Ensure the extracted pieces have clear single responsibilities\n4. Update all call sites and imports\n5. Verify the behavior is preserved",
+    "variables": [
+      { "name": "type", "description": "What to extract", "example": "function / React component / class method" },
+      { "name": "location", "description": "Where the code lives", "example": "processOrder() in src/services/orders.ts (lines 45-200)" }
+    ],
+    "tips": [
+      "Name extracted functions by what they DO, not how they do it.",
+      "Keep the extraction minimal first — you can always extract more later."
+    ],
+    "tags": ["refactor", "extract", "srp", "clean-code"]
+  },
+  {
+    "id": "refactor-rename",
+    "title": "Rename Across Codebase",
+    "category": "refactor",
+    "description": "When you need to rename a variable, function, type, or concept across the entire codebase consistently.",
+    "template": "Rename {{old_name}} to {{new_name}} across the entire codebase.\n\nThis is a {{thing_type}} used in {{scope}}.\n\nPlease:\n1. Find ALL occurrences (code, comments, strings, file names, imports, tests)\n2. Rename each occurrence appropriately (respecting naming conventions: camelCase in code, kebab-case in files, etc.)\n3. Update any related names that should change for consistency\n4. Verify no occurrences were missed",
+    "variables": [
+      { "name": "old_name", "description": "Current name", "example": "userData" },
+      { "name": "new_name", "description": "New name", "example": "userProfile" },
+      { "name": "thing_type", "description": "What it is", "example": "TypeScript interface and its instances" },
+      { "name": "scope", "description": "Where it's used", "example": "throughout the auth and user modules" }
+    ],
+    "tips": [
+      "Use Grep to find all occurrences before renaming to understand the full scope.",
+      "Don't forget to update file names, test descriptions, and documentation strings."
+    ],
+    "tags": ["refactor", "rename", "codebase-wide"]
+  },
+  {
+    "id": "refactor-convert-pattern",
+    "title": "Convert Code Pattern",
+    "category": "refactor",
+    "description": "When you need to convert code from one pattern to another consistently (e.g., callbacks to async/await, classes to functions).",
+    "template": "Convert all instances of {{old_pattern}} to {{new_pattern}} in {{scope}}.\n\nExample of the old pattern:\n```\n{{old_example}}\n```\n\nShould become:\n```\n{{new_example}}\n```\n\nPlease find all instances and convert them, handling edge cases appropriately.",
+    "variables": [
+      { "name": "old_pattern", "description": "The pattern to convert from", "example": "callback-based async functions" },
+      { "name": "new_pattern", "description": "The pattern to convert to", "example": "async/await" },
+      { "name": "scope", "description": "Where to apply the conversion", "example": "src/services/" },
+      { "name": "old_example", "description": "Example of old pattern", "example": "function getData(callback) { fetch(url, (err, data) => callback(err, data)); }" },
+      { "name": "new_example", "description": "Example of new pattern", "example": "async function getData() { const data = await fetch(url); return data; }" }
+    ],
+    "tips": [
+      "Provide a clear before/after example to ensure consistent conversion.",
+      "Run tests after each conversion to catch subtle behavioral differences."
+    ],
+    "tags": ["refactor", "pattern", "migration", "modernize"]
+  },
+  {
+    "id": "refactor-reduce-complexity",
+    "title": "Reduce Code Complexity",
+    "category": "refactor",
+    "description": "When code has too many nested conditions, complex logic, or high cyclomatic complexity.",
+    "template": "The code in {{location}} is too complex. It has {{complexity_issue}}.\n\nPlease simplify it by:\n1. Identifying the core logic vs accidental complexity\n2. Using early returns to reduce nesting\n3. Extracting complex conditions into named booleans\n4. Breaking complex logic into smaller, well-named functions\n5. Ensuring readability improves without changing behavior",
+    "variables": [
+      { "name": "location", "description": "File and function location", "example": "processPayment() in src/billing/processor.ts" },
+      { "name": "complexity_issue", "description": "What makes it complex", "example": "6 levels of nested if/else with multiple early conditions" }
+    ],
+    "tips": [
+      "Early returns are the easiest win for reducing nesting — apply them first.",
+      "Named boolean variables (const isEligible = ...) make conditions self-documenting."
+    ],
+    "tags": ["refactor", "complexity", "clean-code", "readability"]
+  },
+  {
+    "id": "review-security",
+    "title": "Security Code Review",
+    "category": "review",
+    "description": "Perform a focused security review on code, looking for common vulnerabilities and security anti-patterns.",
+    "template": "Please perform a security review of {{scope}}.\n\nFocus on:\n1. Input validation and sanitization\n2. Authentication and authorization checks\n3. SQL injection, XSS, and CSRF vulnerabilities\n4. Sensitive data exposure (logs, errors, responses)\n5. Insecure dependencies or configurations\n6. Race conditions and TOCTOU issues\n7. Secrets or credentials in code\n\nFor each finding, rate severity (critical/high/medium/low) and suggest a fix.",
+    "variables": [
+      { "name": "scope", "description": "What to review", "example": "the auth module at src/auth/ and all API route handlers" }
+    ],
+    "tips": [
+      "Always include authentication and authorization code in security reviews.",
+      "Check for sensitive data in error messages, logs, and API responses."
+    ],
+    "tags": ["review", "security", "audit", "vulnerabilities"]
+  },
+  {
+    "id": "review-pr-thorough",
+    "title": "Thorough PR Review",
+    "category": "review",
+    "description": "Perform a comprehensive code review on a pull request, checking for correctness, style, performance, and maintainability.",
+    "template": "Please review {{pr_reference}} thoroughly.\n\nCheck for:\n1. **Correctness**: Does the code do what it claims? Edge cases handled?\n2. **Design**: Is the approach sound? Are there better alternatives?\n3. **Readability**: Is the code clear and well-structured?\n4. **Performance**: Any obvious bottlenecks or N+1 queries?\n5. **Testing**: Are changes covered by tests? Are tests meaningful?\n6. **Security**: Any security implications?\n7. **Breaking changes**: Could this break existing functionality?\n\nProvide feedback as specific, actionable comments.",
+    "variables": [
+      { "name": "pr_reference", "description": "PR identifier", "example": "PR #42 / the changes on the feature/auth-revamp branch" }
+    ],
+    "tips": [
+      "Focus on the 'why' of changes, not just the 'what' — understanding intent helps catch logical errors.",
+      "Look at the full diff, not just individual files — cross-file interactions often hide bugs."
+    ],
+    "tags": ["review", "pr", "code-review", "quality"]
+  },
+  {
+    "id": "review-performance",
+    "title": "Performance Review",
+    "category": "review",
+    "description": "Review code specifically for performance issues, bottlenecks, and optimization opportunities.",
+    "template": "Please review {{scope}} for performance issues.\n\nLook for:\n1. N+1 query patterns or unnecessary database calls\n2. Missing caching opportunities\n3. Unnecessary re-renders (React) or recomputations\n4. Large bundle sizes or unnecessary imports\n5. Blocking operations that should be async\n6. Memory leaks (event listeners, subscriptions, closures)\n7. Inefficient algorithms or data structures\n\nFor each issue, explain the impact and suggest a specific optimization.",
+    "variables": [
+      { "name": "scope", "description": "What to review", "example": "the feed page at src/pages/Feed.tsx and its data fetching hooks" }
+    ],
+    "tips": [
+      "Performance issues often hide in data fetching patterns — always check those first.",
+      "Look for unnecessary work being done on every render/request."
+    ],
+    "tags": ["review", "performance", "optimization", "bottleneck"]
+  },
+  {
+    "id": "test-unit",
+    "title": "Generate Unit Tests",
+    "category": "test",
+    "description": "Generate comprehensive unit tests for a module, function, or component.",
+    "template": "Write unit tests for {{target}} at {{location}}.\n\nUse {{test_framework}} and follow these guidelines:\n1. Test the happy path with typical inputs\n2. Test edge cases (empty, null, undefined, boundary values)\n3. Test error handling and invalid inputs\n4. Test any important business logic branches\n5. Use descriptive test names that explain the expected behavior\n6. Mock external dependencies appropriately\n\nAim for high coverage of the logic, not just line coverage.",
+    "variables": [
+      { "name": "target", "description": "What to test", "example": "the calculateDiscount function" },
+      { "name": "location", "description": "File path", "example": "src/utils/pricing.ts" },
+      { "name": "test_framework", "description": "Test framework to use", "example": "Jest with React Testing Library / Vitest / pytest" }
+    ],
+    "tips": [
+      "Test behavior, not implementation — tests should verify WHAT the code does, not HOW.",
+      "Each test should test one thing and have a clear, descriptive name."
+    ],
+    "tags": ["test", "unit-test", "coverage", "tdd"]
+  },
+  {
+    "id": "test-integration",
+    "title": "Generate Integration Tests",
+    "category": "test",
+    "description": "Generate integration tests that verify multiple components or services working together correctly.",
+    "template": "Write integration tests for {{feature}} that involves {{components}}.\n\nUse {{test_framework}} and:\n1. Test the full flow from entry point to output\n2. Use realistic test data that matches production patterns\n3. Test both success and failure scenarios\n4. Verify side effects (database writes, API calls, events)\n5. Test error propagation across component boundaries\n6. Clean up test state between runs",
+    "variables": [
+      { "name": "feature", "description": "Feature to test end-to-end", "example": "user registration flow" },
+      { "name": "components", "description": "Components involved", "example": "API route, validation middleware, user service, and database" },
+      { "name": "test_framework", "description": "Test framework", "example": "Jest with supertest" }
+    ],
+    "tips": [
+      "Integration tests should use realistic data — not 'test123' or 'foo@bar.com'.",
+      "Always clean up state between tests to avoid flaky test interdependencies."
+    ],
+    "tags": ["test", "integration", "e2e", "flow"]
+  },
+  {
+    "id": "test-edge-cases",
+    "title": "Find and Test Edge Cases",
+    "category": "test",
+    "description": "Analyze code to identify edge cases that aren't currently tested, then generate tests for them.",
+    "template": "Analyze {{target}} at {{location}} for untested edge cases.\n\n1. Read the code and identify all branches, boundary conditions, and error paths\n2. Compare against existing tests in {{test_location}}\n3. List edge cases that aren't covered\n4. Write tests for the most important missing edge cases\n\nFocus on cases that could cause bugs in production.",
+    "variables": [
+      { "name": "target", "description": "Code to analyze", "example": "the date parsing module" },
+      { "name": "location", "description": "Source file", "example": "src/utils/dates.ts" },
+      { "name": "test_location", "description": "Existing test file", "example": "src/utils/__tests__/dates.test.ts" }
+    ],
+    "tips": [
+      "Common missed edge cases: empty strings, null/undefined, very large numbers, Unicode, concurrent access.",
+      "Focus on edge cases that could cause data corruption or security issues."
+    ],
+    "tags": ["test", "edge-cases", "coverage", "quality"]
+  },
+  {
+    "id": "docs-readme",
+    "title": "Generate README",
+    "category": "docs",
+    "description": "Generate a comprehensive README for a project or module based on the actual code.",
+    "template": "Generate a README.md for {{project_name}} based on the actual codebase.\n\nInclude:\n1. **Project description**: What it does, who it's for\n2. **Quick start**: Installation, setup, running\n3. **Architecture overview**: Key directories and their purposes\n4. **Configuration**: Environment variables, config files\n5. **Development**: How to develop, test, and contribute\n6. **API documentation**: Key endpoints or interfaces (if applicable)\n\nBase everything on the actual code — don't make assumptions.",
+    "variables": [
+      { "name": "project_name", "description": "Name of the project", "example": "BeatIt" }
+    ],
+    "tips": [
+      "Always generate from actual code, not assumptions — read package.json, config files, and entry points.",
+      "Include actual commands from package.json scripts, not generic ones."
+    ],
+    "tags": ["docs", "readme", "documentation", "setup"]
+  },
+  {
+    "id": "docs-api",
+    "title": "Generate API Documentation",
+    "category": "docs",
+    "description": "Generate API documentation from actual route handlers and endpoint implementations.",
+    "template": "Generate API documentation for {{api_scope}}.\n\nFor each endpoint, document:\n1. Method and path (GET /api/users)\n2. Description of what it does\n3. Request parameters (path, query, body) with types\n4. Response format with example JSON\n5. Error responses and status codes\n6. Authentication requirements\n\nBase all documentation on the actual implementation code.",
+    "variables": [
+      { "name": "api_scope", "description": "Which API endpoints to document", "example": "all endpoints in src/app/api/" }
+    ],
+    "tips": [
+      "Read the actual route handler code, validation schemas, and middleware — don't guess.",
+      "Include real response examples based on the actual data structures."
+    ],
+    "tags": ["docs", "api", "endpoints", "reference"]
+  },
+  {
+    "id": "arch-design-system",
+    "title": "Design a System",
+    "category": "architecture",
+    "description": "Design the architecture for a new feature or system component before implementation.",
+    "template": "I need to build {{feature_description}}.\n\nRequirements:\n{{requirements}}\n\nPlease design the architecture:\n1. **Components**: What modules/services/components are needed?\n2. **Data model**: What data structures and schemas?\n3. **Interfaces**: How do components communicate?\n4. **Data flow**: How does data move through the system?\n5. **Error handling**: How are failures handled?\n6. **Scalability**: What are the growth considerations?\n\nProvide the design in the context of the existing codebase architecture.",
+    "variables": [
+      { "name": "feature_description", "description": "What to build", "example": "a real-time notification system" },
+      { "name": "requirements", "description": "List of requirements", "example": "- Push notifications to mobile\n- In-app notification center\n- Email digest option\n- Read/unread tracking" }
+    ],
+    "tips": [
+      "Include non-functional requirements (performance, scale, security) — they heavily influence architecture.",
+      "Ask Claude to consider the existing codebase patterns and stay consistent."
+    ],
+    "tags": ["architecture", "design", "system", "planning"]
+  },
+  {
+    "id": "arch-migration-plan",
+    "title": "Plan a Migration",
+    "category": "architecture",
+    "description": "Plan a migration from one technology, pattern, or architecture to another with minimal disruption.",
+    "template": "I need to migrate {{what}} from {{from_state}} to {{to_state}}.\n\nCurrent state:\n{{current_details}}\n\nPlease create a migration plan:\n1. **Assessment**: What needs to change? What can stay?\n2. **Strategy**: Big bang vs incremental? Feature flags?\n3. **Steps**: Ordered list of migration steps\n4. **Risks**: What could go wrong at each step?\n5. **Rollback**: How to roll back each step if needed\n6. **Testing**: How to verify each step succeeded\n7. **Timeline**: Rough estimate of effort per step",
+    "variables": [
+      { "name": "what", "description": "What's being migrated", "example": "the frontend" },
+      { "name": "from_state", "description": "Current state", "example": "Pages Router with getServerSideProps" },
+      { "name": "to_state", "description": "Target state", "example": "App Router with Server Components" },
+      { "name": "current_details", "description": "Details about current implementation", "example": "25 pages, 12 API routes, Redux for state management" }
+    ],
+    "tips": [
+      "Incremental migration is almost always better than big-bang — plan for coexistence.",
+      "Include rollback plans for every step — migrations are when things most commonly break."
+    ],
+    "tags": ["architecture", "migration", "planning", "strategy"]
+  },
+  {
+    "id": "arch-analyze-deps",
+    "title": "Analyze Dependencies",
+    "category": "architecture",
+    "description": "Analyze the dependency graph of a codebase to understand coupling, identify circular dependencies, and find opportunities to simplify.",
+    "template": "Analyze the dependencies in {{scope}}.\n\n1. Map the import/dependency graph between modules\n2. Identify circular dependencies\n3. Find tightly coupled components that should be decoupled\n4. Identify modules with too many dependencies (high fan-in/fan-out)\n5. Suggest architectural improvements to reduce coupling\n6. Identify unused dependencies in package.json",
+    "variables": [
+      { "name": "scope", "description": "What to analyze", "example": "the src/ directory, focusing on service layer dependencies" }
+    ],
+    "tips": [
+      "Circular dependencies are a red flag — they usually indicate missing abstractions.",
+      "High fan-out (many imports) suggests a module is doing too much."
+    ],
+    "tags": ["architecture", "dependencies", "coupling", "analysis"]
+  },
+  {
+    "id": "git-commit-msg",
+    "title": "Write Commit Message",
+    "category": "git",
+    "description": "Generate a well-crafted commit message based on the current changes.",
+    "template": "Look at the current git diff and staged changes, then write a commit message that:\n1. Has a concise subject line (under 72 chars) starting with a type (feat/fix/refactor/docs/test/chore)\n2. Explains WHY the change was made, not just what changed\n3. Follows the conventions in this repository's recent commit history\n4. Mentions any breaking changes or important side effects",
+    "variables": [],
+    "tips": [
+      "Use /commit skill instead of this pattern for the full commit workflow.",
+      "Good commit messages focus on the motivation and impact, not the diff."
+    ],
+    "tags": ["git", "commit", "message", "conventional"]
+  },
+  {
+    "id": "git-pr-description",
+    "title": "Write PR Description",
+    "category": "git",
+    "description": "Generate a comprehensive pull request description from the branch's changes.",
+    "template": "Create a PR description for the current branch ({{branch_name}}).\n\nLook at ALL commits on this branch (not just the latest) and write:\n1. **Title**: Short, descriptive (under 70 chars)\n2. **Summary**: What was changed and why (2-4 bullet points)\n3. **Details**: Technical details for reviewers\n4. **Test plan**: How to verify the changes work\n5. **Screenshots**: Note if screenshots should be added\n6. **Breaking changes**: List any, or state 'None'",
+    "variables": [
+      { "name": "branch_name", "description": "Current branch name", "example": "feature/user-notifications" }
+    ],
+    "tips": [
+      "Always look at ALL commits, not just the last one.",
+      "The test plan should be specific enough that someone unfamiliar with the code can verify."
+    ],
+    "tags": ["git", "pr", "description", "pull-request"]
+  },
+  {
+    "id": "git-changelog",
+    "title": "Generate Changelog",
+    "category": "git",
+    "description": "Generate a changelog from git history between two references.",
+    "template": "Generate a changelog from {{from_ref}} to {{to_ref}}.\n\nOrganize changes into:\n- **Features**: New functionality\n- **Fixes**: Bug fixes\n- **Breaking Changes**: Changes that require action\n- **Improvements**: Enhancements to existing features\n- **Internal**: Refactors, deps, tooling (if notable)\n\nUse the commit messages and PR titles as source material. Make entries concise and user-focused.",
+    "variables": [
+      { "name": "from_ref", "description": "Starting reference", "example": "v1.2.0" },
+      { "name": "to_ref", "description": "Ending reference", "example": "HEAD" }
+    ],
+    "tips": [
+      "Focus on user-facing changes — internal refactors are less important in a changelog.",
+      "Group related commits into single changelog entries."
+    ],
+    "tags": ["git", "changelog", "release", "history"]
+  },
+  {
+    "id": "explore-codebase",
+    "title": "Understand Codebase",
+    "category": "explore",
+    "description": "Get a comprehensive understanding of a new or unfamiliar codebase.",
+    "template": "I'm new to this codebase. Please help me understand it:\n\n1. **Tech stack**: What frameworks, languages, and tools are used?\n2. **Structure**: What's the directory layout and purpose of each directory?\n3. **Entry points**: Where does the app start? (server, client, scripts)\n4. **Architecture**: What patterns are used? (MVC, service layer, etc.)\n5. **Data flow**: How does data move from user input to storage and back?\n6. **Key files**: Which files are most important to understand first?\n7. **Development**: How to run, test, and deploy?\n\nStart by reading package.json, config files, and entry points.",
+    "variables": [],
+    "tips": [
+      "This works best when Claude can explore the actual codebase — run it in the project directory.",
+      "Follow up with specific questions about areas you need to understand deeply."
+    ],
+    "tags": ["explore", "onboarding", "codebase", "architecture"]
+  },
+  {
+    "id": "explore-find-patterns",
+    "title": "Find Code Patterns",
+    "category": "explore",
+    "description": "Discover recurring patterns and conventions used in a codebase.",
+    "template": "Analyze the codebase and identify the patterns and conventions used for {{pattern_area}}.\n\nFor each pattern found:\n1. Show an example from the code\n2. Explain the convention\n3. Note any inconsistencies or violations\n4. List files that follow this pattern\n\nI want to follow these patterns in my new code.",
+    "variables": [
+      { "name": "pattern_area", "description": "What kind of patterns to look for", "example": "API route handlers / React components / error handling / state management" }
+    ],
+    "tips": [
+      "This is great for onboarding — learn the team's conventions before writing code.",
+      "Ask about specific areas rather than 'all patterns' for more useful results."
+    ],
+    "tags": ["explore", "patterns", "conventions", "consistency"]
+  },
+  {
+    "id": "explore-data-flow",
+    "title": "Trace Data Flow",
+    "category": "explore",
+    "description": "Trace how a specific piece of data flows through the system from input to output.",
+    "template": "Trace the data flow for {{data_description}} through the system.\n\nStarting from {{entry_point}}, follow the data through:\n1. Entry point (API route, event handler, user action)\n2. Validation and transformation layers\n3. Business logic processing\n4. Storage (database, cache, file system)\n5. Response/output generation\n\nFor each step, show the actual code and how the data is transformed.",
+    "variables": [
+      { "name": "data_description", "description": "What data to trace", "example": "a user's profile update" },
+      { "name": "entry_point", "description": "Where the flow starts", "example": "the PUT /api/users/:id endpoint" }
+    ],
+    "tips": [
+      "Data flow traces are excellent for understanding complex systems and finding bugs.",
+      "Pay attention to where data is transformed — that's where bugs hide."
+    ],
+    "tags": ["explore", "data-flow", "trace", "understanding"]
+  },
+  {
+    "id": "perf-bottleneck",
+    "title": "Profile and Fix Bottlenecks",
+    "category": "performance",
+    "description": "Identify and fix performance bottlenecks in a specific area of the codebase.",
+    "template": "The {{area}} is slow — {{symptom}}.\n\nPlease identify the bottleneck:\n1. Analyze the code path from {{start}} to {{end}}\n2. Identify the most likely bottleneck (I/O, computation, memory, etc.)\n3. Look for common performance anti-patterns:\n   - N+1 queries\n   - Unnecessary re-renders\n   - Synchronous blocking\n   - Missing indexes\n   - Excessive memory allocation\n4. Suggest specific optimizations with expected impact\n5. Implement the highest-impact fix",
+    "variables": [
+      { "name": "area", "description": "What's slow", "example": "dashboard page load" },
+      { "name": "symptom", "description": "How the slowness manifests", "example": "takes 5+ seconds to show data on initial load" },
+      { "name": "start", "description": "Start of the slow path", "example": "page route handler" },
+      { "name": "end", "description": "End of the slow path", "example": "rendered dashboard with all widgets" }
+    ],
+    "tips": [
+      "Start with the biggest bottleneck — fixing one thing often has more impact than optimizing many.",
+      "Database queries are the most common bottleneck in web apps."
+    ],
+    "tags": ["performance", "bottleneck", "optimization", "profiling"]
+  },
+  {
+    "id": "perf-optimize-queries",
+    "title": "Optimize Database Queries",
+    "category": "performance",
+    "description": "Analyze and optimize database queries for better performance.",
+    "template": "Optimize the database queries in {{scope}}.\n\n1. Find all database queries ({{orm_or_driver}})\n2. Identify N+1 query patterns\n3. Look for missing indexes on frequently queried columns\n4. Find queries that fetch more data than needed (SELECT *)\n5. Identify opportunities for:\n   - Query batching\n   - Eager loading / joins\n   - Caching\n   - Pagination\n6. Rewrite the worst offenders with optimized versions",
+    "variables": [
+      { "name": "scope", "description": "Where to look", "example": "src/services/ and src/api/" },
+      { "name": "orm_or_driver", "description": "Database access method", "example": "Prisma ORM / raw SQL / Drizzle" }
+    ],
+    "tips": [
+      "N+1 queries are the single most common database performance issue.",
+      "Always check that indexes exist for columns used in WHERE, JOIN, and ORDER BY clauses."
+    ],
+    "tags": ["performance", "database", "queries", "optimization"]
+  },
+  {
+    "id": "security-audit",
+    "title": "Security Vulnerability Audit",
+    "category": "security",
+    "description": "Perform a comprehensive security audit looking for common vulnerability patterns.",
+    "template": "Perform a security audit of {{scope}}.\n\nCheck for:\n1. **Injection**: SQL injection, NoSQL injection, command injection, XSS\n2. **Authentication**: Weak password handling, session management, token expiry\n3. **Authorization**: Missing access controls, IDOR, privilege escalation\n4. **Data exposure**: PII in logs, verbose errors, insecure storage\n5. **Configuration**: Default credentials, debug mode, CORS misconfiguration\n6. **Dependencies**: Known vulnerable packages (check package.json/lock file)\n7. **Cryptography**: Weak algorithms, hardcoded secrets, insecure random\n\nRate each finding by severity and provide a specific remediation.",
+    "variables": [
+      { "name": "scope", "description": "What to audit", "example": "the entire backend API in src/api/ and src/middleware/" }
+    ],
+    "tips": [
+      "Focus on the OWASP Top 10 — they cover the vast majority of real-world vulnerabilities.",
+      "Check .env.example and config files for sensitive defaults."
+    ],
+    "tags": ["security", "audit", "vulnerabilities", "owasp"]
+  },
+  {
+    "id": "security-auth-review",
+    "title": "Authentication & Authorization Review",
+    "category": "security",
+    "description": "Deep review of authentication and authorization implementation.",
+    "template": "Review the authentication and authorization system in {{scope}}.\n\nCheck:\n1. **Auth flow**: Login, registration, password reset, session management\n2. **Token handling**: JWT creation, validation, expiry, refresh\n3. **Password security**: Hashing algorithm, salt, minimum requirements\n4. **Session management**: Expiry, invalidation, concurrent sessions\n5. **Authorization**: Route protection, role-based access, resource ownership\n6. **Edge cases**: Expired tokens, deleted users, permission changes\n7. **Rate limiting**: Login attempts, password reset, API calls\n\nFlag any issues and provide specific fixes.",
+    "variables": [
+      { "name": "scope", "description": "Auth-related code location", "example": "src/auth/, src/middleware/auth.ts, and all protected API routes" }
+    ],
+    "tips": [
+      "Pay special attention to the boundary between 'authenticated' and 'authorized' — they're different concerns.",
+      "Check what happens to active sessions when a user changes their password or is deleted."
+    ],
+    "tags": ["security", "authentication", "authorization", "auth"]
+  }
+]
