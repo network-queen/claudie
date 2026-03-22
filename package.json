@@ -27,7 +27,7 @@
     "dev:client": "vite",
     "dev:server": "tsx watch server/index.ts",
     "build": "vite build",
-    "start": "[ -d dist ] || npm run build && tsx server/index.ts",
+    "start": "[ -d dist ] || npm run build && NODE_ENV=production tsx server/index.ts",
     "preview": "npm run build && npm start",
     "prepublishOnly": "npm run build"
   },
