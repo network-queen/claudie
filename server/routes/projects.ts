@@ -359,26 +359,41 @@ router.delete('/remove', (req: Request, res: Response) => {
     }
 
     // Delete GitHub repo if requested
+    let remoteDeleted = false;
     if (deleteFromGit) {
       try {
         const remote = execSync('git remote get-url origin', {
           cwd: resolved, encoding: 'utf-8', timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'],
         }).trim();
-        // Extract owner/repo from URL
         const match = remote.match(/github\.com[/:]([^/]+\/[^/.]+)/);
         if (match) {
           const repo = match[1].replace(/\.git$/, '');
-          execSync(`gh repo delete ${repo} --yes`, {
-            cwd: resolved, encoding: 'utf-8', timeout: 15000, stdio: ['pipe', 'pipe', 'pipe'],
+          console.log(`[projects] Deleting GitHub repo: ${repo}`);
+          const output = execSync(`gh repo delete "${repo}" --yes 2>&1`, {
+            cwd: resolved, encoding: 'utf-8', timeout: 30000, shell: '/bin/sh',
           });
+          console.log(`[projects] gh repo delete output: ${output.trim()}`);
+          remoteDeleted = true;
+        } else {
+          console.log(`[projects] Could not parse remote URL: ${remote}`);
         }
       } catch (ghErr: any) {
-        console.log(`[projects] GitHub repo deletion skipped: ${ghErr.message?.split('\n')[0] || 'unknown'}`);
+        const stderr = (ghErr.stderr?.toString() || ghErr.stdout?.toString() || ghErr.message || '').trim();
+        console.log(`[projects] GitHub repo deletion failed: ${stderr.slice(0, 300)}`);
+        if (stderr.includes('delete_repo')) {
+          // Local files still get deleted, but warn about remote
+          rmSync(resolved, { recursive: true, force: true });
+          res.json({
+            data: { path: resolved, removed: true, remoteDeleted: false,
+              warning: 'GitHub repo not deleted — run this in your terminal first: gh auth refresh -h github.com -s delete_repo' }
+          });
+          return;
+        }
       }
     }
 
     rmSync(resolved, { recursive: true, force: true });
-    res.json({ data: { path: resolved, removed: true } });
+    res.json({ data: { path: resolved, removed: true, remoteDeleted } });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to delete project';
     res.status(500).json({ error: message });

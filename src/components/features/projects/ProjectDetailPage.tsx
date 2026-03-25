@@ -4,7 +4,7 @@ import { useResizable } from '@/hooks/useResizable';
 import CodeEditor from '@/components/shared/CodeEditor';
 import {
   ArrowLeft, Play, Square, File, Folder, FolderOpen, ChevronRight, ChevronDown,
-  FileJson, FileCode, FileText, FileType, Save, Sparkles, X, ShieldOff, Upload, GitCommit, ChevronUp, Rocket, FlagOff, Trophy, AlertTriangle, Globe, Lock, Zap, Paperclip, RotateCcw,
+  FileJson, FileCode, FileText, FileType, Save, Sparkles, X, ShieldOff, Upload, GitCommit, ChevronUp, Rocket, FlagOff, Trophy, AlertTriangle, Globe, Lock, Zap, Paperclip, RotateCcw, Copy, Mic, MicOff,
   Plus, Send, SendHorizonal, CheckCircle2, Circle, Loader2, MessageSquare, Trash2,
 } from 'lucide-react';
 import { Terminal } from '@xterm/xterm';
@@ -78,6 +78,41 @@ export default function ProjectDetailPage() {
   // Tasks
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  const toggleSpeech = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) { alert('Speech recognition not supported in this browser'); return; }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    recognitionRef.current = recognition;
+
+    let finalTranscript = newTaskTitle;
+    recognition.onresult = (event: any) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += (finalTranscript ? ' ' : '') + event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      setNewTaskTitle(finalTranscript + (interim ? ' ' + interim : ''));
+    };
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+    recognition.start();
+    setIsListening(true);
+  };
   const [commentingTaskId, setCommentingTaskId] = useState<string | null>(null);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -763,8 +798,16 @@ export default function ProjectDetailPage() {
                 <div className="flex gap-1">
                   <input type="text" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && addTask()}
-                    placeholder="New task..."
-                    className="flex-1 bg-surface-900 border border-surface-700 rounded px-2 py-1 text-xs text-white placeholder-surface-500 focus:outline-none focus:border-accent-500" />
+                    placeholder={isListening ? 'Listening...' : 'New task...'}
+                    className={`flex-1 bg-surface-900 border rounded px-2 py-1 text-xs text-white placeholder-surface-500 focus:outline-none ${
+                      isListening ? 'border-red-500 animate-pulse' : 'border-surface-700 focus:border-accent-500'
+                    }`} />
+                  <button onClick={toggleSpeech} title={isListening ? 'Stop listening' : 'Voice input'}
+                    className={`p-1 rounded transition-colors ${
+                      isListening ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' : 'bg-surface-700 hover:bg-surface-600 text-surface-300'
+                    }`}>
+                    {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                  </button>
                   <button onClick={addTask} disabled={!newTaskTitle.trim()}
                     className="p-1 bg-accent-500 hover:bg-accent-600 disabled:opacity-40 text-white rounded transition-colors">
                     <Plus className="w-3.5 h-3.5" />
@@ -1401,19 +1444,50 @@ function TreeItem({ node, depth, onFileClick, selectedPath }: {
   node: TreeNode; depth: number; onFileClick: (n: TreeNode) => void; selectedPath?: string;
 }) {
   const [expanded, setExpanded] = useState(depth < 1);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const isDir = node.type === 'directory';
   const isSelected = node.path === selectedPath;
   const Icon = isDir ? (expanded ? FolderOpen : Folder) : getFileIcon(node.name);
+
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const close = () => setCtxMenu(null);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [ctxMenu]);
+
   return (
     <div>
       <div className={`flex items-center gap-1.5 px-2 py-0.5 cursor-pointer text-xs transition-colors ${
         isSelected ? 'bg-accent-500/15 text-accent-400' : 'text-surface-300 hover:bg-surface-700/50 hover:text-white'
       }`} style={{ paddingLeft: `${depth * 14 + 8}px` }}
-        onClick={() => { if (isDir) setExpanded(!expanded); else onFileClick(node); }}>
+        onClick={() => { if (isDir) setExpanded(!expanded); else onFileClick(node); }}
+        onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY }); }}>
         {isDir ? (expanded ? <ChevronDown className="w-3 h-3 text-surface-500 shrink-0" /> : <ChevronRight className="w-3 h-3 text-surface-500 shrink-0" />) : <span className="w-3" />}
         <Icon className={`w-3 h-3 shrink-0 ${isDir ? 'text-amber-400' : 'text-surface-400'}`} />
         <span className="truncate">{node.name}</span>
       </div>
+      {ctxMenu && (
+        <div className="fixed z-50 bg-surface-800 border border-surface-700 rounded-lg shadow-xl py-1 min-w-[140px]"
+          style={{ left: ctxMenu.x, top: ctxMenu.y }} onClick={(e) => e.stopPropagation()}>
+          {!isDir && (
+            <button onClick={() => { onFileClick(node); setCtxMenu(null); }}
+              className="w-full text-left px-3 py-1.5 text-xs text-surface-300 hover:text-white hover:bg-surface-700 flex items-center gap-2">
+              <FileText className="w-3.5 h-3.5" /> Open file
+            </button>
+          )}
+          {isDir && (
+            <button onClick={() => { setExpanded(!expanded); setCtxMenu(null); }}
+              className="w-full text-left px-3 py-1.5 text-xs text-surface-300 hover:text-white hover:bg-surface-700 flex items-center gap-2">
+              <FolderOpen className="w-3.5 h-3.5" /> {expanded ? 'Collapse' : 'Expand'}
+            </button>
+          )}
+          <button onClick={() => { navigator.clipboard.writeText(node.path); setCtxMenu(null); }}
+            className="w-full text-left px-3 py-1.5 text-xs text-surface-300 hover:text-white hover:bg-surface-700 flex items-center gap-2">
+            <Copy className="w-3.5 h-3.5" /> Copy path
+          </button>
+        </div>
+      )}
       {isDir && expanded && node.children?.map((child) => (
         <TreeItem key={child.path} node={child} depth={depth + 1} onFileClick={onFileClick} selectedPath={selectedPath} />
       ))}
