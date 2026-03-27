@@ -256,28 +256,16 @@ router.post('/create', (req: Request, res: Response) => {
       }
     }
 
-    // Auto-create GitHub remote if git was initialized
-    let remoteUrl: string | null = null;
+    // Initial commit
     if (initGit) {
-      const repoName = name || basename(projectPath);
       try {
-        // Initial commit so gh repo create works
         execSync('git add -A && git commit -m "Initial commit" --allow-empty', {
           cwd: projectPath, timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'], shell: '/bin/sh',
         });
-        // Create GitHub repo and set as remote
-        const output = execSync(
-          `gh repo create "${repoName}" --private --source=. --remote=origin --push 2>&1`,
-          { cwd: projectPath, encoding: 'utf-8', timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] }
-        );
-        remoteUrl = output.trim();
-      } catch (ghErr: any) {
-        // gh not installed or auth failed — not critical, continue
-        console.log(`[projects] GitHub remote creation skipped: ${ghErr.message?.split('\n')[0] || 'unknown error'}`);
-      }
+      } catch {}
     }
 
-    res.json({ data: { path: projectPath, created: true, remoteUrl } });
+    res.json({ data: { path: projectPath, created: true } });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to create project';
     res.status(500).json({ error: message });

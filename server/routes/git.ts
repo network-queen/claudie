@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { execSync } from 'child_process';
+import { basename } from 'path';
 
 const router = Router();
 
@@ -234,6 +235,32 @@ router.post('/reset', (req: Request, res: Response) => {
     res.json({ data: { output, hash } });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Git reset failed';
+    res.status(500).json({ error: message });
+  }
+});
+
+// Ensure GitHub remote exists (creates repo if needed)
+router.post('/ensure-remote', (req: Request, res: Response) => {
+  try {
+    const { path: projectPath } = req.body || {};
+    if (!projectPath) { res.status(400).json({ error: 'path required' }); return; }
+
+    // Check if remote already exists
+    try {
+      const remote = runGit('remote get-url origin', projectPath);
+      if (remote) { res.json({ data: { remote, created: false } }); return; }
+    } catch {}
+
+    // No remote — create GitHub repo
+    const repoName = basename(projectPath);
+    const output = execSync(
+      `gh repo create "${repoName}" --private --source=. --remote=origin --push 2>&1`,
+      { cwd: projectPath, encoding: 'utf-8', timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] }
+    ).trim();
+
+    res.json({ data: { remote: output, created: true } });
+  } catch (err: any) {
+    const message = err.stderr?.toString().slice(0, 200) || err.message || 'Failed';
     res.status(500).json({ error: message });
   }
 });

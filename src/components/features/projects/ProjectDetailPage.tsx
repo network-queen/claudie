@@ -438,10 +438,12 @@ export default function ProjectDetailPage() {
   const handleRelease = async () => {
     setReleasing(true);
     try {
+      // Ensure GitHub remote exists (creates on first release)
+      await fetch('/api/git/ensure-remote', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: projectPath }) }).catch(() => {});
+
       if (termIdRef.current && featureBranch) {
-        sendWs({ type: 'input', id: termIdRef.current,
-          data: `First push all committed changes to the remote branch "${featureBranch}". Then squash-merge "${featureBranch}" into master (or main) as a single commit with a summary of all changes, push master to remote, then create a new feature branch for the next round of work. Tell me the new branch name when done.\r`
-        });
+        sendToActiveTerminal(`First push all committed changes to the remote branch "${featureBranch}". Then squash-merge "${featureBranch}" into master (or main) as a single commit with a summary of all changes, push master to remote, then create a new feature branch for the next round of work. Tell me the new branch name when done.\r`);
       }
     } finally {
       setShowReleaseConfirm(false);
