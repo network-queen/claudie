@@ -16,6 +16,21 @@ let pollInterval: ReturnType<typeof setInterval> | null = null;
 let lastUpdateId = 0;
 let activeProject = '';
 
+// Track which projects are currently waiting for input
+const waitingProjects = new Map<string, { name: string; since: Date }>();
+
+export function setProjectWaiting(projectPath: string, projectName: string) {
+  waitingProjects.set(projectPath, { name: projectName, since: new Date() });
+}
+
+export function clearProjectWaiting(projectPath: string) {
+  waitingProjects.delete(projectPath);
+}
+
+export function getWaitingProjects(): Map<string, { name: string; since: Date }> {
+  return waitingProjects;
+}
+
 export function setActiveProject(path: string) { activeProject = path; }
 export function getActiveProject() { return activeProject; }
 
@@ -117,7 +132,7 @@ async function handleMessage(text: string, chatId: string) {
     } else {
       msg += `No project selected. Use /projects to see available ones.\n\n`;
     }
-    msg += `*Commands:*\n/projects — List & select project\n/use <name> — Switch project\n/task <description> — Create a task\n/do <description> — Create & run immediately\n/run <id> — Execute a task\n/tasks — List tasks\n/status — Project info`;
+    msg += `*Commands:*\n/projects — List & select project\n/use <name> — Switch project\n/task <description> — Create a task\n/do <description> — Create & run immediately\n/run <id> — Execute a task\n/reply @name <msg> — Reply to project session\n/waiting — Show projects waiting for input\n/tasks — List tasks\n/status — Project info`;
     await sendTelegramMessage(msg, chatId);
   }
 
@@ -129,6 +144,8 @@ async function handleMessage(text: string, chatId: string) {
       `/task <description> — Create a task\n` +
       `/do <description> — Create & run immediately\n` +
       `/run <id> — Execute an existing task\n` +
+      `/reply @name <msg> — Reply to project session\n` +
+      `/waiting — Show projects waiting for input\n` +
       `/tasks — List all tasks\n` +
       `/status — Current project info\n` +
       `/help — This message`,
@@ -213,6 +230,58 @@ async function handleMessage(text: string, chatId: string) {
     }
   }
 
+  else if (text.startsWith('/reply ')) {
+    let reply = text.slice(7).trim();
+    if (!reply) { await sendTelegramMessage('Usage: /reply @project <message>', chatId); return; }
+
+    // Require @projectname targeting
+    if (!reply.startsWith('@')) {
+      await sendTelegramMessage('Usage: /reply @project <message>', chatId);
+      return;
+    }
+
+    const spaceIdx = reply.indexOf(' ');
+    if (spaceIdx === -1) { await sendTelegramMessage('Usage: /reply @project <message>', chatId); return; }
+    const target = reply.slice(1, spaceIdx).toLowerCase();
+    reply = reply.slice(spaceIdx + 1).trim();
+
+    // Find matching project from waiting list or scanned projects
+    let targetPath = '';
+    let targetName = '';
+    const waiting = Array.from(waitingProjects.entries());
+    const match = waiting.find(([, v]) => v.name.toLowerCase() === target || v.name.toLowerCase().includes(target));
+    if (match) {
+      targetPath = match[0];
+      targetName = match[1].name;
+    } else {
+      const projects = scanProjects();
+      const projMatch = projects.find((p) => p.name.toLowerCase() === target || p.name.toLowerCase().includes(target));
+      if (projMatch) { targetPath = projMatch.path; targetName = projMatch.name; }
+      else { await sendTelegramMessage(`❌ Project "${target}" not found`, chatId); return; }
+    }
+
+    const sent = sendToTerminal ? sendToTerminal(targetPath, reply + '\r') : false;
+    if (sent) {
+      clearProjectWaiting(targetPath);
+      await sendTelegramMessage(`💬 Sent to *${targetName}*:\n${reply}`, chatId);
+    } else {
+      await sendTelegramMessage(`❌ No active session for *${targetName}*. Open the project in Claudie first.`, chatId);
+    }
+  }
+
+  else if (text === '/waiting') {
+    if (waitingProjects.size === 0) {
+      await sendTelegramMessage('✅ No projects waiting for input right now.', chatId);
+    } else {
+      const lines = Array.from(waitingProjects.entries()).map(([, v]) => {
+        const ago = Math.round((Date.now() - v.since.getTime()) / 1000);
+        const agoStr = ago < 60 ? `${ago}s` : `${Math.round(ago / 60)}m`;
+        return `⏳ *${v.name}* (${agoStr} ago)`;
+      });
+      await sendTelegramMessage(`*Waiting for input:*\n${lines.join('\n')}\n\nUse /reply @name <message>`, chatId);
+    }
+  }
+
   else if (text === '/status') {
     if (!activeProject) {
       await sendTelegramMessage(`🐾 *Claudie*\nNo project selected. Use /projects`, chatId);
@@ -225,6 +294,35 @@ async function handleMessage(text: string, chatId: string) {
         `🐾 *Claudie Status*\n\nProject: *${projectName}*\n\`${activeProject}\`\n\nTasks: ${open} open, ${inProgress} active, ${closed} done`,
         chatId
       );
+    }
+  }
+
+  // Default: plain text without a command → reply to the most recently waiting project
+  else if (!text.startsWith('/')) {
+    // Find the most recently waiting project
+    let targetPath = '';
+    let targetName = '';
+    if (waitingProjects.size > 0) {
+      let latest: Date | null = null;
+      for (const [path, info] of waitingProjects.entries()) {
+        if (!latest || info.since > latest) {
+          latest = info.since;
+          targetPath = path;
+          targetName = info.name;
+        }
+      }
+    }
+
+    if (targetPath) {
+      const sent = sendToTerminal ? sendToTerminal(targetPath, text + '\r') : false;
+      if (sent) {
+        clearProjectWaiting(targetPath);
+        await sendTelegramMessage(`💬 Sent to *${targetName}*:\n${text}`, chatId);
+      } else {
+        await sendTelegramMessage(`❌ No active session for *${targetName}*.`, chatId);
+      }
+    } else {
+      await sendTelegramMessage(`No project waiting for input. Use /reply @project <message> to target one.`, chatId);
     }
   }
 }

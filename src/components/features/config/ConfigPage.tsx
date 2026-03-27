@@ -694,14 +694,16 @@ function TelegramTab() {
 
       <div>
         <h3 className="text-sm font-medium text-white mb-1">Telegram Bot Integration</h3>
-        <p className="text-xs text-surface-500">Get notified when Claude needs input. Add and run tasks from Telegram.</p>
+        <p className="text-xs text-surface-500">Get notified when Claudie needs input. Add and run tasks from Telegram.</p>
       </div>
 
       <label className="flex items-center gap-2 cursor-pointer">
         <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)}
           className="w-4 h-4 rounded border-surface-600 bg-surface-900 text-accent-500" />
-        <span className="text-sm text-surface-300">Enable Telegram notifications</span>
+        <span className="text-sm text-surface-300">Enable Telegram bot</span>
+        <span className="text-[10px] text-surface-500">(global — controls bot polling, commands, and all notifications)</span>
       </label>
+      <p className="text-xs text-surface-500 -mt-4 ml-6">Per-project notifications can be toggled via the "TG notify" checkbox in each project header.</p>
 
       <div>
         <label className="block text-xs text-surface-400 mb-1">Bot Token</label>

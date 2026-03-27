@@ -4,6 +4,7 @@ import {
   createTerminal,
   listTerminals,
   killTerminal,
+  getScrollback,
 } from '../services/terminalManager.js';
 import {
   launchClaudeSession,
@@ -66,6 +67,54 @@ router.delete('/:id', (req: Request, res: Response) => {
     res.json({ data: { id, killed: true } });
   } catch (err) {
     res.status(500).json({ error: 'Failed to kill terminal' });
+  }
+});
+
+// Get last N lines of terminal output (for waiting context)
+router.get('/scrollback-tail', (req: Request, res: Response) => {
+  try {
+    const sessions = listTerminals();
+    const projectPath = req.query.path as string;
+    const lines = parseInt(req.query.lines as string) || 30;
+
+    // Find terminal for this project
+    const session = sessions.find((s) => s.alive && s.sessionConfig?.projectPath === projectPath);
+    if (!session) {
+      res.json({ data: { lines: [] } });
+      return;
+    }
+
+    const scrollback = getScrollback(session.id);
+    // Strip all terminal escape sequences
+    const clean = scrollback
+      // OSC sequences: \x1b] ... (terminated by BEL \x07 or ST \x1b\\)
+      .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
+      // CSI sequences: \x1b[ ... letter
+      .replace(/\x1b\[[0-9;?]*[a-zA-Z$]/g, '')
+      // Other escape sequences: \x1b followed by single char or >...
+      .replace(/\x1b[><=()][^\x1b]*/g, '')
+      .replace(/\x1b[a-zA-Z]/g, '')
+      // Remaining control chars
+      .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '')
+      .replace(/\r/g, '')
+      .split('\n')
+      .map((l: string) => l.trim())
+      .filter((l: string) =>
+        l.length > 0 &&
+        // Filter spinner lines
+        !l.match(/^(◐|◑|◒|◓|⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏|●)/) &&
+        // Filter shell init noise
+        !l.match(/^(Restored session|The operation couldn|Please visit http|%\s*$)/) &&
+        // Filter opencode init sequences (pppp, raw escape leftovers)
+        !l.match(/^[p\s]*$/) &&
+        !l.match(/^\]/) &&
+        // Filter bare command invocations
+        !l.match(/^\/?\/usr\/local\/bin\/(opencode|claude)/)
+      );
+    const tail = clean.slice(-lines);
+    res.json({ data: { lines: tail } });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get scrollback' });
   }
 });
 

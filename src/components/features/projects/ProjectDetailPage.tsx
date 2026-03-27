@@ -152,6 +152,11 @@ export default function ProjectDetailPage() {
     try { return JSON.parse(localStorage.getItem(`claudie-pr-${projectPath}`) || 'false'); } catch { return false; }
   });
 
+  // Per-project Telegram notifications
+  const [tgNotify, setTgNotify] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`claudie-tg-${projectPath}`) ?? 'true'); } catch { return true; }
+  });
+
   // Feature branch
   const [featureBranch, setFeatureBranch] = useState('');
   const [showReleaseConfirm, setShowReleaseConfirm] = useState(false);
@@ -179,6 +184,14 @@ export default function ProjectDetailPage() {
   });
   const [skipPermissions] = useState(true);
   const [appRunning, setAppRunning] = useState(false);
+
+  // Sync model when switching projects
+  useEffect(() => {
+    try {
+      const projectModel = localStorage.getItem(`claudie-model-${projectPath}`);
+      if (projectModel && projectModel !== model) setModel(projectModel);
+    } catch {}
+  }, [projectPath]);
   const [projectScripts, setProjectScripts] = useState<{ start?: string; stop?: string }>({});
 
   // Load project scripts
@@ -209,6 +222,7 @@ export default function ProjectDetailPage() {
   const [claudeWaiting, setClaudeWaiting] = useState(false);
   const outputTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notifiedRef = useRef(false);
+  const responseStartRowRef = useRef<number>(0);
   const [terminalReady, setTerminalReady] = useState(false);
   const termContainerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -219,11 +233,66 @@ export default function ProjectDetailPage() {
 
 
   // --- Notify when Claude is waiting ---
-  const notifyClaude = useCallback(() => {
+  const notifyClaude = useCallback(async () => {
     if (notifiedRef.current) return;
     notifiedRef.current = true;
     setClaudeWaiting(true);
     try { const w = JSON.parse(localStorage.getItem('claudie-waiting') || '{}'); w[projectPath] = true; localStorage.setItem('claudie-waiting', JSON.stringify(w)); } catch {}
+
+    // Extract last 30 lines from xterm.js buffer (works for both Claude CLI and OpenCode TUI)
+    let contextText = '';
+    try {
+      const term = termRef.current;
+      if (term) {
+        const buf = term.buffer.active;
+        const endRow = buf.baseY + buf.cursorY;
+        const markedRow = responseStartRowRef.current;
+        const startRow = (markedRow > 0 && markedRow < endRow) ? markedRow : Math.max(0, endRow - 60);
+
+        // For OpenCode: find the sidebar border column by scanning for the most common █ position
+        let borderCol = 0;
+        if (activeCli === 'opencode') {
+          const colCounts: Record<number, number> = {};
+          for (let i = Math.max(0, endRow - 20); i <= endRow; i++) {
+            const line = buf.getLine(i);
+            if (!line) continue;
+            const full = line.translateToString(false);
+            // Find rightmost █ — the sidebar border is a vertical line of █
+            for (let c = full.length - 1; c >= 0; c--) {
+              if (full[c] === '█') {
+                colCounts[c] = (colCounts[c] || 0) + 1;
+                break;
+              }
+            }
+          }
+          // The border is the column that appears in the most lines
+          let maxCount = 0;
+          for (const [col, count] of Object.entries(colCounts)) {
+            if (count > maxCount) { maxCount = count; borderCol = parseInt(col); }
+          }
+        }
+
+        const rawLines: string[] = [];
+        for (let i = startRow; i <= endRow; i++) {
+          const line = buf.getLine(i);
+          if (!line) continue;
+          let text = line.translateToString(false);
+          // Crop at sidebar border
+          if (borderCol > 0) text = text.substring(0, borderCol);
+          rawLines.push(text.trim());
+        }
+
+        console.log('[claudie-context] borderCol:', borderCol, 'startRow:', startRow, 'endRow:', endRow, 'rawLines:', rawLines.slice(-10));
+
+        const filtered = rawLines
+          .filter((l) => l.length > 0 && !l.match(/^[▣⬖┃│]+$/) && !l.match(/^Build\s+·/))
+          .map((l) => l.replace(/^[┃│]\s*/, '').trim())
+          .filter((l) => l.length > 0);
+
+        console.log('[claudie-context] filtered:', filtered.slice(-10));
+        contextText = filtered.slice(-30).join('\n');
+      }
+    } catch {}
 
     // Audio beep
     try {
@@ -248,17 +317,22 @@ export default function ProjectDetailPage() {
       }, 180);
     } catch {}
 
-    // Browser notification
+    // Browser notification with context
     if (Notification.permission === 'granted') {
-      new Notification('Claude needs your input', { body: `${projectName} — Claude is waiting for a response`, icon: '/logo.jpg' });
+      const body = contextText
+        ? `${projectName}:\n${contextText.slice(0, 200)}`
+        : `${projectName} — Claudie is waiting for your response`;
+      new Notification('Claudie needs your input', { body, icon: '/logo.jpg' });
     } else if (Notification.permission !== 'denied') {
       Notification.requestPermission();
     }
 
-    // Telegram notification
-    fetch('/api/telegram/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: `🐾 *${projectName}* — Claude is waiting for your input` }) }).catch(() => {});
-  }, [projectName]);
+    // Telegram notification with context + reply hint (respects per-project toggle)
+    if (tgNotify) {
+      fetch('/api/telegram/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: `🐾 *${projectName}* — Claudie is waiting for your input`, context: contextText || undefined, projectPath, projectName }) }).catch(() => {});
+    }
+  }, [projectName, projectPath, tgNotify]);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -385,7 +459,18 @@ export default function ProjectDetailPage() {
 
   const runSkill = (skill: { name: string; content: string }) => {
     if (!termIdRef.current) return;
-    sendToActiveTerminal(`/${skill.name}\r`);
+    if (activeCli === 'opencode') {
+      // OpenCode doesn't support slash commands — send a summary instruction
+      // TUI can't handle large text pastes, so condense to first 500 chars as context
+      const summary = skill.content.length > 500
+        ? skill.content.slice(0, 500) + '...'
+        : skill.content;
+      // Replace newlines with spaces for single-line TUI input
+      const oneLiner = summary.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+      sendToActiveTerminal(oneLiner + '\r');
+    } else {
+      sendToActiveTerminal(`/${skill.name}\r`);
+    }
   };
 
   const fetchGitInfo = useCallback(async () => {
@@ -601,6 +686,8 @@ export default function ProjectDetailPage() {
   // Helper to send input to whichever terminal is active
   const sendToActiveTerminal = (text: string) => {
     if (!termIdRef.current) return;
+    // Mark where the new response will start
+    if (termRef.current) responseStartRowRef.current = termRef.current.buffer.active.baseY + termRef.current.buffer.active.cursorY;
     // For TUI apps like OpenCode: send text first, then Enter separately
     if (text.endsWith('\r')) {
       const body = text.slice(0, -1);
@@ -650,6 +737,11 @@ export default function ProjectDetailPage() {
       setClaudeWaiting(false);
       notifiedRef.current = false;
       if (outputTimerRef.current) clearTimeout(outputTimerRef.current);
+      // Mark where the new response will start (current cursor row)
+      responseStartRowRef.current = term.buffer.active.baseY + term.buffer.active.cursorY;
+      // Clear server-side waiting state
+      fetch('/api/telegram/clear-waiting', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: projectPath }) }).catch(() => {});
     });
 
     ws.onopen = () => {
@@ -706,8 +798,8 @@ export default function ProjectDetailPage() {
               taskLogsRef.current[activeTaskIdRef.current] = taskLogsRef.current[activeTaskIdRef.current].slice(-50000);
             }
           }
-          // Detect Claude's input prompt: ❯ character
-          if (msg.data.includes('❯')) {
+          // Detect input prompt: ❯ for Claude, cursor-show sequence for OpenCode
+          if (msg.data.includes('❯') || (activeCli === 'opencode' && msg.data.includes('\x1b[?25h'))) {
             // Small delay to confirm it's really the prompt (not mid-stream)
             if (outputTimerRef.current) clearTimeout(outputTimerRef.current);
             outputTimerRef.current = setTimeout(() => notifyClaude(), 1500);
@@ -807,6 +899,15 @@ export default function ProjectDetailPage() {
               }}
               className="w-3 h-3 rounded border-surface-600 bg-surface-900 text-accent-500" />
             <span className="text-[10px] text-surface-400">PR required</span>
+          </label>
+          <label className="flex items-center gap-1 cursor-pointer">
+            <input type="checkbox" checked={tgNotify}
+              onChange={(e) => {
+                setTgNotify(e.target.checked);
+                try { localStorage.setItem(`claudie-tg-${projectPath}`, JSON.stringify(e.target.checked)); } catch {}
+              }}
+              className="w-3 h-3 rounded border-surface-600 bg-surface-900 text-accent-500" />
+            <span className="text-[10px] text-surface-400">TG notify</span>
           </label>
         </div>
 

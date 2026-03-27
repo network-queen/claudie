@@ -47,8 +47,9 @@ Claudie is a local web dashboard that gives you a visual interface for AI-powere
 ### Terminal
 - Full PTY terminal via Python bridge
 - Persistent sessions — survive browser refresh
-- Audio + browser + Telegram notifications when AI needs input
+- Audio + browser + Telegram notifications when AI needs input — with terminal context
 - "Waiting for input" indicator in sidebar for all open projects
+- **Per-project Telegram toggle** — "TG notify" checkbox in project header
 - Configurable model with live switching
 - **DECRQM escape sequence stripping** for OpenCode TUI compatibility
 - `--dangerously-skip-permissions` auto-enabled for Claude
@@ -67,12 +68,17 @@ Claudie is a local web dashboard that gives you a visual interface for AI-powere
 - Manage custom slash commands (`~/.claude/commands/*.md`)
 - Install from URL (supports skills.sh, GitHub raw URLs)
 - **Generate skills with AI** — describe what you want, AI writes the skill
-- Run skills from the project view
+- Run skills from the project view — works with both Claude Code (slash commands) and OpenCode (sends skill content as prompt)
 
 ### Telegram Bot
-- Get notified when AI needs your input
+- Get notified when AI needs your input — includes terminal context showing what AI is asking
+- **Reply from Telegram** — send input back to the IDE terminal without opening the browser
+- `/reply @projectname <message>` — target a specific project; plain text auto-replies to the most recently waiting project
+- `/waiting` — see all projects currently waiting for input
 - Create and run tasks from your phone
 - `/do` command — create and immediately run a task
+- **Per-project notifications** — toggle "TG notify" checkbox per project in the header
+- **Global toggle** — enable/disable all Telegram notifications in Config > Telegram
 
 **Bot commands:**
 | Command | Description |
@@ -83,6 +89,8 @@ Claudie is a local web dashboard that gives you a visual interface for AI-powere
 | `/task <desc>` | Create a new task |
 | `/do <desc>` | Create & run task immediately |
 | `/run <id>` | Execute an existing task |
+| `/reply @name <msg>` | Send input to a project's terminal |
+| `/waiting` | Show projects waiting for input |
 | `/tasks` | List all tasks with status |
 | `/status` | Project info & task stats |
 | `/help` | Command reference |

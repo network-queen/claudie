@@ -296,7 +296,15 @@ export function startServer(port: number): Server {
     const sessions = listTerminals();
     const session = sessions.find((s) => s.alive && s.sessionConfig?.projectPath === projectPath);
     if (session) {
-      return writeTerminal(session.id, text);
+      // Send text and Enter separately with delay (TUI apps like OpenCode swallow combined input)
+      if (text.endsWith('\r')) {
+        const body = text.slice(0, -1);
+        writeTerminal(session.id, body);
+        setTimeout(() => writeTerminal(session.id, '\r'), 150);
+      } else {
+        writeTerminal(session.id, text);
+      }
+      return true;
     }
     return false;
   });

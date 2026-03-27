@@ -179,8 +179,8 @@ export default function Layout() {
                 const isWaiting = !!waitingProjects[proj.path];
                 return (
                   <div key={proj.path} className="group relative">
-                    <Link
-                      to={`/project?path=${encodeURIComponent(proj.path)}`}
+                    <a
+                      href={`/project?path=${encodeURIComponent(proj.path)}`}
                       className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                         isWaiting
                           ? 'bg-amber-500/10 text-amber-400'
@@ -194,7 +194,7 @@ export default function Layout() {
                         : <Sparkles className="w-3.5 h-3.5 shrink-0" />}
                       <span className="truncate">{proj.name}</span>
                       {isWaiting && <span className="text-[9px] text-amber-400/70 shrink-0 ml-auto">input</span>}
-                    </Link>
+                    </a>
                     <button
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCloseConfirmProject(proj); }}
                       className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-surface-600 hover:text-surface-300 opacity-0 group-hover:opacity-100 transition-opacity"

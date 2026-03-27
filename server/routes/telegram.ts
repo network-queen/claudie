@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getTelegramConfig, saveTelegramConfig, sendTelegramMessage, setActiveProject } from '../services/telegramBot.js';
+import { getTelegramConfig, saveTelegramConfig, sendTelegramMessage, setActiveProject, setProjectWaiting, clearProjectWaiting } from '../services/telegramBot.js';
 
 const router = Router();
 
@@ -33,9 +33,32 @@ router.put('/active-project', (req: Request, res: Response) => {
 
 router.post('/notify', async (req: Request, res: Response) => {
   try {
-    await sendTelegramMessage(req.body?.message || '🐾 *Claude needs your input*');
+    let msg = req.body?.message || '🐾 *Claudie needs your input*';
+    const context = req.body?.context;
+    const projectPath = req.body?.projectPath;
+    const projectName = req.body?.projectName;
+
+    // Track this project as waiting
+    if (projectPath && projectName) {
+      setProjectWaiting(projectPath, projectName);
+    }
+
+    if (context) {
+      msg += `\n\n📋 *Last output:*\n\`\`\`\n${context.slice(0, 800)}\n\`\`\``;
+      if (projectName) {
+        msg += `\n\n💬 /reply @${projectName} <message>`;
+      }
+    }
+    await sendTelegramMessage(msg);
     res.json({ data: { sent: true } });
   } catch { res.status(500).json({ error: 'Failed' }); }
+});
+
+// Clear waiting state when user interacts via IDE
+router.post('/clear-waiting', (req: Request, res: Response) => {
+  const { path } = req.body || {};
+  if (path) clearProjectWaiting(path);
+  res.json({ data: { ok: true } });
 });
 
 export default router;
