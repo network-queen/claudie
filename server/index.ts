@@ -24,6 +24,7 @@ import filesRouter from './routes/files.js';
 import configEditorRouter from './routes/configEditor.js';
 import tasksRouter from './routes/tasks.js';
 import claudeChatRouter from './routes/claudeChat.js';
+import telegramRouter from './routes/telegram.js';
 
 import {
   createTerminal,
@@ -76,6 +77,7 @@ app.use('/api/files', filesRouter);
 app.use('/api/config-editor', configEditorRouter);
 app.use('/api/tasks', tasksRouter);
 app.use('/api/claude', claudeChatRouter);
+app.use('/api/telegram', telegramRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {

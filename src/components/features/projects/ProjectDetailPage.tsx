@@ -5,7 +5,7 @@ import CodeEditor from '@/components/shared/CodeEditor';
 import {
   ArrowLeft, Play, Square, File, Folder, FolderOpen, ChevronRight, ChevronDown,
   FileJson, FileCode, FileText, FileType, Save, Sparkles, X, ShieldOff, Upload, GitCommit, ChevronUp, Rocket, FlagOff, Trophy, AlertTriangle, Globe, Lock, Zap, Paperclip, RotateCcw, Copy, Mic, MicOff,
-  Plus, Send, SendHorizonal, CheckCircle2, Circle, Loader2, MessageSquare, Trash2,
+  Plus, Send, SendHorizonal, CheckCircle2, Circle, Loader2, MessageSquare, Trash2, Undo2, Link as LinkIcon,
 } from 'lucide-react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -18,6 +18,7 @@ interface Task {
   comments: { text: string; createdAt: string }[]; createdAt: string;
   startedAt?: string; closedAt?: string;
   log?: string;
+  nextTaskId?: string;
 }
 
 const fileIcons: Record<string, typeof File> = {
@@ -153,6 +154,12 @@ export default function ProjectDetailPage() {
   const [finishStep, setFinishStep] = useState<'choose' | 'confirm-delete'>('choose');
   const [showVisibilityConfirm, setShowVisibilityConfirm] = useState(false);
 
+  // Error detector (Feature 1)
+
+  // Rollback (Feature 2)
+  const [showRollbackConfirm, setShowRollbackConfirm] = useState(false);
+  const [rollingBack, setRollingBack] = useState(false);
+
   // Diff review
   const [showDiffReview, setShowDiffReview] = useState(false);
   const [diffContent, setDiffContent] = useState('');
@@ -164,6 +171,32 @@ export default function ProjectDetailPage() {
   const [model, setModel] = useState(saved.model || 'claude-opus-4-6');
   const [skipPermissions] = useState(true);
   const [appRunning, setAppRunning] = useState(false);
+  const [projectScripts, setProjectScripts] = useState<{ start?: string; stop?: string }>({});
+
+  // Load project scripts
+  useEffect(() => {
+    if (!projectPath) return;
+    fetch(`/api/projects/scripts?path=${encodeURIComponent(projectPath)}`)
+      .then((r) => r.json())
+      .then((j) => setProjectScripts(j.data ?? {}))
+      .catch(() => {});
+  }, [projectPath]);
+
+  const runStartStop = (action: 'start' | 'stop') => {
+    if (!termIdRef.current) return;
+    const script = projectScripts[action];
+    if (script) {
+      // Use cached script directly in shell (bypass Claude)
+      sendWs({ type: 'input', id: termIdRef.current, data: `!${script}\r` });
+    } else {
+      // First time — ask Claude, then watch for the command it runs
+      const prompt = action === 'start'
+        ? 'start the project in dev mode. Tell me the exact command you used.'
+        : 'stop the project, kill all running dev servers. Tell me the exact command you used.';
+      sendWs({ type: 'input', id: termIdRef.current, data: prompt + '\r' });
+    }
+    setAppRunning(action === 'start');
+  };
   const [wsConnected, setWsConnected] = useState(false);
   const [claudeWaiting, setClaudeWaiting] = useState(false);
   const outputTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -212,6 +245,10 @@ export default function ProjectDetailPage() {
     } else if (Notification.permission !== 'denied') {
       Notification.requestPermission();
     }
+
+    // Telegram notification
+    fetch('/api/telegram/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: `🐾 *${projectName}* — Claude is waiting for your input` }) }).catch(() => {});
   }, [projectName]);
 
   // Request notification permission on mount
@@ -256,6 +293,11 @@ export default function ProjectDetailPage() {
   }, [projectPath]);
 
   useEffect(() => { fetchTree(); const iv = setInterval(fetchTree, 10000); return () => clearInterval(iv); }, [fetchTree]);
+
+  // Set active project for Telegram bot
+  useEffect(() => {
+    if (projectPath) fetch('/api/telegram/active-project', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: projectPath }) }).catch(() => {});
+  }, [projectPath]);
 
   // Auto-create/detect feature branch on project open
   useEffect(() => {
@@ -387,14 +429,13 @@ export default function ProjectDetailPage() {
     try {
       if (termIdRef.current && featureBranch) {
         sendWs({ type: 'input', id: termIdRef.current,
-          data: `Squash-merge the current branch "${featureBranch}" into master (or main) as a single commit with a summary of all changes, push master to remote, then create a new feature branch for the next round of work. Tell me the new branch name when done.\r`
+          data: `First push all committed changes to the remote branch "${featureBranch}". Then squash-merge "${featureBranch}" into master (or main) as a single commit with a summary of all changes, push master to remote, then create a new feature branch for the next round of work. Tell me the new branch name when done.\r`
         });
       }
     } finally {
       setShowReleaseConfirm(false);
       setTimeout(() => {
         setReleasing(false);
-        // Refresh to pick up new branch
         fetchGitInfo();
       }, 5000);
     }
@@ -419,6 +460,16 @@ export default function ProjectDetailPage() {
         body: JSON.stringify({ project: projectPath, status, log }) });
       setTasks((prev) => prev.map((t) => t.id === id ? { ...t, status, log: log || t.log } : t));
       if (status === 'closed' && activeTaskIdRef.current === id) activeTaskIdRef.current = null;
+      // Feature 4: Auto-send next chained task
+      if (status === 'closed') {
+        const closedTask = tasks.find((t) => t.id === id);
+        if (closedTask?.nextTaskId) {
+          const nextTask = tasks.find((t) => t.id === closedTask.nextTaskId);
+          if (nextTask && nextTask.status === 'open') {
+            setTimeout(() => sendTaskToClaude(nextTask), 1000);
+          }
+        }
+      }
     } catch {}
   };
 
@@ -533,6 +584,19 @@ export default function ProjectDetailPage() {
         return line;
       }).join('\n');
     sendWs({ type: 'input', id: termIdRef.current, data: prompt + '\r' });
+  };
+
+  // Feature 4: Chain a task as next after the current in-progress task
+  const chainTaskAfterCurrent = async (taskId: string) => {
+    const inProgressTask = tasks.find((t) => t.status === 'in-progress');
+    if (!inProgressTask) return;
+    try {
+      await fetch(`/api/tasks/${inProgressTask.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project: projectPath, nextTaskId: taskId }),
+      });
+      setTasks((prev) => prev.map((t) => t.id === inProgressTask.id ? { ...t, nextTaskId: taskId } : t));
+    } catch {}
   };
 
   // --- Terminal ---
@@ -687,16 +751,20 @@ export default function ProjectDetailPage() {
 
         <div className="ml-auto flex items-center gap-2">
           {!appRunning ? (
-            <button onClick={() => { if (termIdRef.current) { sendWs({ type: 'input', id: termIdRef.current, data: 'start the project, run it in dev mode\r' }); setAppRunning(true); } }}
+            <button onClick={() => runStartStop('start')}
               disabled={!terminalReady} className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/15 hover:bg-green-500/25 disabled:opacity-40 text-green-400 text-xs font-medium rounded-lg transition-colors">
               <Play className="w-3.5 h-3.5" /> Start
             </button>
           ) : (
-            <button onClick={() => { if (termIdRef.current) { sendWs({ type: 'input', id: termIdRef.current, data: 'stop the project, kill all running dev servers and processes\r' }); setAppRunning(false); } }}
+            <button onClick={() => runStartStop('stop')}
               disabled={!terminalReady} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/15 hover:bg-red-500/25 disabled:opacity-40 text-red-400 text-xs font-medium rounded-lg transition-colors">
               <Square className="w-3.5 h-3.5" /> Stop
             </button>
           )}
+          <button onClick={() => setShowRollbackConfirm(true)} disabled={!terminalReady || commits.length <= 1}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/15 hover:bg-orange-500/25 disabled:opacity-40 text-orange-400 text-xs font-medium rounded-lg transition-colors">
+            <Undo2 className="w-3.5 h-3.5" /> Rollback
+          </button>
           <button onClick={handlePush} disabled={!terminalReady || pushing}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/15 hover:bg-blue-500/25 disabled:opacity-40 text-blue-400 text-xs font-medium rounded-lg transition-colors">
             <Upload className="w-3.5 h-3.5" /> {pushing ? 'Pushing...' : 'Push'}
@@ -879,6 +947,17 @@ export default function ProjectDetailPage() {
                             <CheckCircle2 className="w-3 h-3" /> Done
                           </button>
                         )}
+                        {task.status === 'open' && tasks.some((t) => t.status === 'in-progress') && (
+                          <button onClick={() => chainTaskAfterCurrent(task.id)}
+                            title="Chain after current task"
+                            className={`p-0.5 transition-colors ${
+                              tasks.some((t) => t.nextTaskId === task.id)
+                                ? 'text-accent-400'
+                                : 'text-surface-500 hover:text-accent-400'
+                            }`}>
+                            <LinkIcon className="w-3 h-3" />
+                          </button>
+                        )}
                         {task.status !== 'closed' && (
                           <button onClick={() => sendTaskToClaude(task)} disabled={!terminalReady} title="Send to Claude"
                             className="p-0.5 text-accent-400/60 hover:text-accent-400 disabled:opacity-40 transition-colors">
@@ -924,6 +1003,16 @@ export default function ProjectDetailPage() {
                       {task.startedAt && task.closedAt && (
                         <span className="text-[9px] text-surface-600">({duration(task.startedAt, task.closedAt)})</span>
                       )}
+                      {tasks.some((t) => t.nextTaskId === task.id) && (
+                        <span className="flex items-center gap-0.5 text-[9px] text-accent-400">
+                          <LinkIcon className="w-2.5 h-2.5" /> queued next
+                        </span>
+                      )}
+                      {task.nextTaskId && (
+                        <span className="flex items-center gap-0.5 text-[9px] text-surface-500">
+                          <LinkIcon className="w-2.5 h-2.5" /> chains to [{task.nextTaskId.slice(0, 8)}]
+                        </span>
+                      )}
                     </div>
 
                     {task.comments.length > 0 && (
@@ -941,9 +1030,25 @@ export default function ProjectDetailPage() {
                       <div className="flex gap-1 pl-5">
                         <input type="text" value={commentText} onChange={(e) => setCommentText(e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && addComment(task.id)}
-                          placeholder="Add feedback..."
+                          placeholder={isListening ? 'Listening...' : 'Add feedback...'}
                           autoFocus
-                          className="flex-1 bg-surface-800 border border-surface-700 rounded px-1.5 py-0.5 text-[10px] text-white placeholder-surface-500 focus:outline-none focus:border-accent-500" />
+                          className={`flex-1 bg-surface-800 border rounded px-1.5 py-0.5 text-[10px] text-white placeholder-surface-500 focus:outline-none ${isListening ? 'border-red-500' : 'border-surface-700 focus:border-accent-500'}`} />
+                        <button onClick={() => {
+                          // Reuse toggleSpeech but target commentText
+                          if (isListening) { recognitionRef.current?.stop(); setIsListening(false); return; }
+                          const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+                          if (!SR) return;
+                          const r = new SR(); r.continuous = true; r.interimResults = true; r.lang = 'en-US';
+                          recognitionRef.current = r;
+                          let final = commentText;
+                          r.onresult = (ev: any) => { let interim = ''; for (let i = ev.resultIndex; i < ev.results.length; i++) { if (ev.results[i].isFinal) final += (final ? ' ' : '') + ev.results[i][0].transcript; else interim += ev.results[i][0].transcript; } setCommentText(final + (interim ? ' ' + interim : '')); };
+                          r.onend = () => setIsListening(false);
+                          r.onerror = () => setIsListening(false);
+                          r.start(); setIsListening(true);
+                        }}
+                          className={`p-0.5 rounded transition-colors ${isListening ? 'text-red-400 animate-pulse' : 'text-surface-500 hover:text-surface-300'}`}>
+                          {isListening ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                        </button>
                         <button onClick={() => addComment(task.id)} disabled={!commentText.trim()}
                           className="px-1.5 py-0.5 bg-accent-500/20 text-accent-400 disabled:opacity-40 text-[10px] rounded transition-colors">
                           Add
@@ -1174,6 +1279,54 @@ export default function ProjectDetailPage() {
                 className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
                 <Rocket className="w-4 h-4" />
                 {releasing ? 'Releasing...' : 'Release'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rollback Confirmation */}
+      {showRollbackConfirm && commits.length > 1 && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-surface-800 border border-surface-700 rounded-xl w-full max-w-md">
+            <div className="p-5 space-y-4">
+              <div className="flex items-center gap-3 text-red-400">
+                <Undo2 className="w-6 h-6 shrink-0" />
+                <h2 className="text-lg font-semibold">Rollback Last Commit</h2>
+              </div>
+              <p className="text-sm text-surface-300">
+                This will <span className="text-red-400 font-medium">revert</span> the following commit:
+              </p>
+              <div className="bg-surface-900 rounded-lg px-3 py-2 space-y-1">
+                <code className="text-xs text-accent-400 font-mono">{commits[0]?.hash.slice(0, 7)}</code>
+                <p className="text-sm text-surface-200">{commits[0]?.message}</p>
+              </div>
+              <p className="text-xs text-surface-500">
+                The code will be reset to commit <code className="text-accent-400 font-mono">{commits[1]?.hash.slice(0, 7)}</code>. This cannot be undone easily.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 p-5 border-t border-surface-700">
+              <button onClick={() => setShowRollbackConfirm(false)}
+                className="px-4 py-2 text-sm text-surface-300 hover:text-white rounded-lg transition-colors">
+                Cancel
+              </button>
+              <button onClick={async () => {
+                setRollingBack(true);
+                try {
+                  await fetch('/api/git/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: projectPath, hash: commits[1]?.hash }),
+                  });
+                  fetchGitInfo();
+                  fetchTree();
+                } catch {}
+                setRollingBack(false);
+                setShowRollbackConfirm(false);
+              }} disabled={rollingBack}
+                className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
+                <Undo2 className="w-4 h-4" />
+                {rollingBack ? 'Rolling back...' : 'Rollback'}
               </button>
             </div>
           </div>

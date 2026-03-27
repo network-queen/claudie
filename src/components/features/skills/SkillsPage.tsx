@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Save, Trash2, Zap, X, Check, AlertTriangle, FileText, Download } from 'lucide-react';
+import { Plus, Save, Trash2, Zap, X, Check, AlertTriangle, FileText, Download, Sparkles, Loader2 } from 'lucide-react';
 import { useApi } from '@/hooks/useApi';
 import Card from '@/components/shared/Card';
 import SearchInput from '@/components/shared/SearchInput';
@@ -58,6 +58,11 @@ export default function SkillsPage() {
   const [saving, setSaving] = useState(false);
   const [showInstall, setShowInstall] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Skill | null>(null);
+  const [showGenerate, setShowGenerate] = useState(false);
+  const [genPrompt, setGenPrompt] = useState('');
+  const [genName, setGenName] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [genPreview, setGenPreview] = useState('');
   const [installUrl, setInstallUrl] = useState('');
   const [installing, setInstalling] = useState(false);
 
@@ -161,6 +166,68 @@ export default function SkillsPage() {
     }
   };
 
+  const handleGenerate = async () => {
+    if (!genPrompt.trim() || !genName.trim()) return;
+    setGenerating(true);
+    setGenPreview('');
+    try {
+      const res = await fetch('/api/claude/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: `You are a technical writer. DO NOT use any tools. DO NOT write any files. DO NOT execute any commands. ONLY output text.
+
+Write the markdown content for a Claude Code custom slash command skill. Just output the raw markdown text, nothing else.
+
+Skill name: ${genName.trim()}
+Description from user: "${genPrompt.trim()}"
+
+Use this exact format:
+
+---
+name: ${genName.trim()}
+description: (one sentence about what this skill does)
+---
+
+(Detailed instructions for Claude when /${genName.trim()} is invoked. Include: what to do step by step, rules to follow, what to avoid. Be specific and production-quality.)
+
+Remember: output ONLY the markdown text. No code fences. No explanations. No file operations.`,
+        }),
+      });
+      const data = await res.json();
+      const content = data.data?.response || '';
+      if (content) {
+        setGenPreview(content);
+      } else {
+        notify('error', 'No response from Claude');
+      }
+    } catch {
+      notify('error', 'Failed to generate skill');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleSaveGenerated = async () => {
+    if (!genPreview || !genName.trim()) return;
+    try {
+      const res = await fetch(`/api/skills/${encodeURIComponent(genName.trim())}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: genPreview }),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      setShowGenerate(false);
+      setGenPrompt('');
+      setGenName('');
+      setGenPreview('');
+      refetch();
+      notify('success', `Created /${genName.trim()}`);
+    } catch {
+      notify('error', 'Failed to save skill');
+    }
+  };
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -171,12 +238,17 @@ export default function SkillsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setShowInstall(!showInstall)}
+          <button onClick={() => { setShowGenerate(!showGenerate); setShowInstall(false); setShowNew(false); }}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 text-sm rounded-lg transition-colors">
+            <Sparkles className="w-4 h-4" />
+            Generate with AI
+          </button>
+          <button onClick={() => { setShowInstall(!showInstall); setShowGenerate(false); setShowNew(false); }}
             className="flex items-center gap-2 px-4 py-2 bg-surface-700 hover:bg-surface-600 text-white text-sm rounded-lg transition-colors">
             <Download className="w-4 h-4" />
             Install from URL
           </button>
-          <button onClick={() => setShowNew(!showNew)}
+          <button onClick={() => { setShowNew(!showNew); setShowGenerate(false); setShowInstall(false); }}
             className="flex items-center gap-2 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white text-sm font-medium rounded-lg transition-colors">
             <Plus className="w-4 h-4" />
             New Skill
@@ -207,6 +279,69 @@ export default function SkillsPage() {
               {installing ? 'Installing...' : 'Install'}
             </button>
           </div>
+        </Card>
+      )}
+
+      {/* Generate with AI */}
+      {showGenerate && (
+        <Card className="space-y-3">
+          <h3 className="text-sm font-medium text-white flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-400" /> Generate Skill with AI
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs text-surface-400 mb-1">Skill Name</label>
+              <div className="relative">
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-accent-400 text-sm font-mono">/</span>
+                <input type="text" value={genName}
+                  onChange={(e) => setGenName(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
+                  placeholder="my-skill"
+                  className="w-full bg-surface-900 border border-surface-700 rounded-lg pl-6 pr-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-accent-500" />
+              </div>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-xs text-surface-400 mb-1">Describe what this skill should do</label>
+              <input type="text" value={genPrompt}
+                onChange={(e) => setGenPrompt(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && genName.trim() && genPrompt.trim() && handleGenerate()}
+                placeholder="e.g. Review code for security vulnerabilities and suggest fixes"
+                className="w-full bg-surface-900 border border-surface-700 rounded-lg px-3 py-2 text-sm text-white placeholder-surface-500 focus:outline-none focus:border-accent-500" />
+            </div>
+          </div>
+
+          {!genPreview && (
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowGenerate(false)} className="px-3 py-1.5 text-xs text-surface-400 hover:text-white rounded-md">Cancel</button>
+              <button onClick={handleGenerate} disabled={generating || !genName.trim() || !genPrompt.trim()}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-xs font-medium rounded-md transition-colors">
+                {generating ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</> : <><Sparkles className="w-3.5 h-3.5" /> Generate</>}
+              </button>
+            </div>
+          )}
+
+          {genPreview && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-surface-400 mb-1">Preview — edit if needed</label>
+                <textarea value={genPreview}
+                  onChange={(e) => setGenPreview(e.target.value)}
+                  rows={14}
+                  spellCheck={false}
+                  className="w-full bg-surface-900 border border-surface-700 rounded-lg px-3 py-2 text-sm text-surface-200 font-mono focus:outline-none focus:border-accent-500 resize-y"
+                  style={{ tabSize: 2 }} />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button onClick={handleGenerate} disabled={generating}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-700 hover:bg-surface-600 text-white text-xs rounded-md transition-colors">
+                  {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />} Regenerate
+                </button>
+                <button onClick={handleSaveGenerated}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-medium rounded-md transition-colors">
+                  <Save className="w-3.5 h-3.5" /> Save as /{genName}
+                </button>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 

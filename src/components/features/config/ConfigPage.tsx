@@ -5,6 +5,7 @@ import {
   FileText,
   Plug,
   Save,
+  Send,
   Plus,
   Trash2,
   Check,
@@ -17,12 +18,13 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import ErrorState from '@/components/shared/ErrorState';
 import EmptyState from '@/components/shared/EmptyState';
 
-type TabId = 'settings' | 'mcp' | 'claude-md';
+type TabId = 'settings' | 'mcp' | 'claude-md' | 'telegram';
 
 const tabs: { id: TabId; label: string; icon: typeof Settings }[] = [
   { id: 'settings', label: 'Settings', icon: Settings },
   { id: 'mcp', label: 'MCP Servers', icon: Plug },
   { id: 'claude-md', label: 'CLAUDE.md', icon: FileText },
+  { id: 'telegram', label: 'Telegram', icon: Send },
 ];
 
 function Notification({ type, text }: { type: 'success' | 'error'; text: string }) {
@@ -550,6 +552,106 @@ function ClaudeMdTab() {
   );
 }
 
+function TelegramTab() {
+  const [botToken, setBotToken] = useState('');
+  const [chatId, setChatId] = useState('');
+  const [enabled, setEnabled] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/telegram/config').then((r) => r.json()).then((j) => {
+      const d = j.data || {};
+      setBotToken(d.botToken || '');
+      setChatId(d.chatId || '');
+      setEnabled(d.enabled || false);
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await fetch('/api/telegram/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ botToken, chatId, enabled }) });
+      setNotification({ type: 'success', text: 'Telegram config saved' });
+      setTimeout(() => setNotification(null), 3000);
+    } catch {
+      setNotification({ type: 'error', text: 'Failed to save' });
+    } finally { setSaving(false); }
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    try {
+      const res = await fetch('/api/telegram/test', { method: 'POST' });
+      if (res.ok) setNotification({ type: 'success', text: 'Test message sent! Check Telegram.' });
+      else setNotification({ type: 'error', text: 'Failed to send test message' });
+    } catch {
+      setNotification({ type: 'error', text: 'Failed' });
+    } finally { setTesting(false); setTimeout(() => setNotification(null), 3000); }
+  };
+
+  if (!loaded) return <LoadingSpinner />;
+
+  return (
+    <div className="space-y-6">
+      {notification && <Notification type={notification.type} text={notification.text} />}
+
+      <div>
+        <h3 className="text-sm font-medium text-white mb-1">Telegram Bot Integration</h3>
+        <p className="text-xs text-surface-500">Get notified when Claude needs input. Add and run tasks from Telegram.</p>
+      </div>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)}
+          className="w-4 h-4 rounded border-surface-600 bg-surface-900 text-accent-500" />
+        <span className="text-sm text-surface-300">Enable Telegram notifications</span>
+      </label>
+
+      <div>
+        <label className="block text-xs text-surface-400 mb-1">Bot Token</label>
+        <input type="text" value={botToken} onChange={(e) => setBotToken(e.target.value)}
+          placeholder="123456:ABC-DEF..."
+          className="w-full bg-surface-900 border border-surface-700 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-surface-500 focus:outline-none focus:border-accent-500" />
+        <p className="text-xs text-surface-500 mt-1">Create a bot via @BotFather on Telegram</p>
+      </div>
+
+      <div>
+        <label className="block text-xs text-surface-400 mb-1">Chat ID</label>
+        <input type="text" value={chatId} onChange={(e) => setChatId(e.target.value)}
+          placeholder="Your Telegram chat ID"
+          className="w-full bg-surface-900 border border-surface-700 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-surface-500 focus:outline-none focus:border-accent-500" />
+        <p className="text-xs text-surface-500 mt-1">Send /start to @userinfobot to get your chat ID</p>
+      </div>
+
+      <div className="flex gap-2">
+        <button onClick={handleSave} disabled={saving}
+          className="flex items-center gap-1.5 px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
+          <Save className="w-4 h-4" /> {saving ? 'Saving...' : 'Save'}
+        </button>
+        <button onClick={handleTest} disabled={testing || !enabled || !botToken || !chatId}
+          className="flex items-center gap-1.5 px-4 py-2 bg-surface-700 hover:bg-surface-600 disabled:opacity-40 text-white text-sm rounded-lg transition-colors">
+          <Send className="w-4 h-4" /> {testing ? 'Sending...' : 'Send Test'}
+        </button>
+      </div>
+
+      <Card>
+        <h4 className="text-xs font-medium text-surface-400 mb-2">Bot Commands</h4>
+        <div className="space-y-1 text-xs font-mono">
+          <p><span className="text-accent-400">/task</span> <span className="text-surface-500">&lt;description&gt;</span> — Create a new task</p>
+          <p><span className="text-accent-400">/run</span> <span className="text-surface-500">&lt;task-id&gt;</span> — Execute a task</p>
+          <p><span className="text-accent-400">/tasks</span> — List all tasks</p>
+          <p><span className="text-accent-400">/status</span> — Current project info</p>
+          <p><span className="text-accent-400">/help</span> — Show commands</p>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 export default function ConfigPage() {
   const [activeTab, setActiveTab] = useState<TabId>('settings');
 
@@ -584,6 +686,7 @@ export default function ConfigPage() {
       {activeTab === 'settings' && <SettingsTab />}
       {activeTab === 'mcp' && <McpTab />}
       {activeTab === 'claude-md' && <ClaudeMdTab />}
+      {activeTab === 'telegram' && <TelegramTab />}
     </div>
   );
 }

@@ -121,41 +121,87 @@ claudie/
 ### Projects
 - Create new projects with description — Claude generates CLAUDE.md and builds it
 - Clone existing repos — Claude explores and creates CLAUDE.md
+- Project templates: React+TS, Node API, Static Site, Python CLI, Chrome Extension
 - Feature branch workflow — auto-creates feature branches, squash-merge releases
-- Start/Stop app, Push, Release, Finish project
-- PR required mode — diff review overlay before commits
+- Start/Stop app with script caching (runs directly after first time)
+- Push, Release (push + squash-merge to master), Rollback last commit
+- PR required mode — visual diff review overlay before commits
+- Finish project — mark as completed or delete with GitHub repo
+- Public/Private repository toggle
+- File explorer with CodeMirror editor (syntax highlighting for 10+ languages)
+- Voice input for task creation (Web Speech API)
 
 ### Tasks
 - Create tasks, send to Claude with one click
-- UUID tracking — commits reference task IDs
-- Filter git log by task
+- Voice input — speak your tasks via microphone
+- UUID tracking — commits reference task IDs `[a1b2c3d4]`
+- Filter git log by task UUID
+- Task dependencies — chain tasks to auto-run sequentially
 - Comments as feedback loop — auto-reopens closed tasks
-- File attachments
-- Interaction log per task
-- Time tracking (started/done/duration)
+- File attachments — attach images/docs for Claude to reference
+- Interaction log per task (captured terminal output)
+- Time tracking (created/started/done/duration)
+- Task statistics with progress bar
+- Double-click to edit task text
 
 ### Terminal
 - Full PTY terminal via Python bridge
 - Persistent sessions — survive browser refresh
-- Audio + browser notifications when Claude is waiting
-- "Waiting for input" indicator in sidebar
+- Audio + browser + Telegram notifications when Claude needs input
+- "Waiting for input" indicator in sidebar for all open projects
+- Configurable model (Opus/Sonnet/Haiku) with live switching
+
+### Git
+- Commit history with timestamps, filterable by task UUID
+- Click any commit to view full diff
+- Feature branch workflow with auto-creation
+- Rollback button — one-click revert with confirmation
+- Release — push + squash-merge to master
+- Branch and remote info in git panel
+- Fold/unfold git panel
 
 ### Skills
 - Manage custom slash commands (`~/.claude/commands/*.md`)
 - Install from URL (supports skills.sh, GitHub)
+- Generate skills with AI — describe what you want, Claude writes the skill
 - Run skills from project view
+
+### Telegram Bot
+- Get notified when Claude needs your input
+- Manage tasks from your phone
+
+**Bot commands:**
+| Command | Description |
+|---------|-------------|
+| `/start` | Welcome message & command list |
+| `/projects` | List available projects |
+| `/use <name>` | Switch to a project |
+| `/task <desc>` | Create a new task |
+| `/do <desc>` | Create & run task immediately |
+| `/run <id>` | Execute an existing task |
+| `/tasks` | List all tasks with status |
+| `/status` | Project info & task stats |
+| `/help` | Command reference |
+
+**Setup:**
+1. Create a bot via [@BotFather](https://t.me/BotFather) on Telegram
+2. Get your Chat ID from [@userinfobot](https://t.me/userinfobot)
+3. Go to Claudie → Config → Telegram tab
+4. Enter bot token + chat ID, enable, save
 
 ### Configuration
 - Edit MCP servers (add/remove/update)
-- Global CLAUDE.md editor
+- Global CLAUDE.md editor with create template
 - Settings viewer (read-only)
-- 6 color themes
+- 6 color themes (Dark Purple, Midnight Blue, Forest, Crimson, Warm Amber, Light)
+- Telegram bot integration
 
 ## Tech Stack
 
 - **Frontend**: React 19, Vite, Tailwind CSS, CodeMirror 6, xterm.js
 - **Backend**: Node.js, Express, WebSocket
 - **Terminal**: Python PTY bridge (no native modules needed)
+- **Integrations**: GitHub CLI, Telegram Bot API, Web Speech API
 
 ## License
 

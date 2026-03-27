@@ -98,15 +98,39 @@ export default function Layout() {
     }
   }, [pathname, search]);
 
-  const closeProject = (projectPath: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const [closeConfirmProject, setCloseConfirmProject] = useState<OpenProject | null>(null);
+
+  const confirmCloseProject = async () => {
+    if (!closeConfirmProject) return;
+    const projectPath = closeConfirmProject.path;
+
+    // Kill the Claude terminal session for this project
+    try {
+      const res = await fetch('/api/terminal/sessions');
+      const data = await res.json();
+      const sessions = data.data || [];
+      for (const session of sessions) {
+        if (session.alive && session.sessionConfig?.projectPath === projectPath) {
+          await fetch(`/api/terminal/${session.id}`, { method: 'DELETE' });
+        }
+      }
+    } catch {}
+
+    // Clear waiting state
+    try {
+      const w = JSON.parse(localStorage.getItem('claudie-waiting') || '{}');
+      delete w[projectPath];
+      localStorage.setItem('claudie-waiting', JSON.stringify(w));
+    } catch {}
+
     setOpenProjects((prev) => {
       const updated = prev.filter((p) => p.path !== projectPath);
       saveOpenProjects(updated);
       return updated;
     });
-    // If we're viewing this project, navigate to projects list
+    setCloseConfirmProject(null);
+
+    // Navigate away if viewing this project
     const params = new URLSearchParams(search);
     if (pathname === '/project' && params.get('path') === projectPath) {
       window.location.href = '/projects';
@@ -172,7 +196,7 @@ export default function Layout() {
                       {isWaiting && <span className="text-[9px] text-amber-400/70 shrink-0 ml-auto">input</span>}
                     </Link>
                     <button
-                      onClick={(e) => closeProject(proj.path, e)}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCloseConfirmProject(proj); }}
                       className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-surface-600 hover:text-surface-300 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <X className="w-3 h-3" />
@@ -207,6 +231,31 @@ export default function Layout() {
       <main className="flex-1 overflow-y-auto bg-surface-900">
         <Outlet />
       </main>
+
+      {/* Close project confirmation */}
+      {closeConfirmProject && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-surface-800 border border-surface-700 rounded-xl w-full max-w-md">
+            <div className="p-5 space-y-4">
+              <h2 className="text-lg font-semibold text-white">Close Project</h2>
+              <p className="text-sm text-surface-300">
+                Close <span className="text-white font-medium">{closeConfirmProject.name}</span>? This will terminate the Claude session for this project.
+              </p>
+              <p className="text-xs text-surface-500">Your files and git history are not affected. You can reopen the project anytime — a new Claude session will start.</p>
+            </div>
+            <div className="flex justify-end gap-2 p-5 border-t border-surface-700">
+              <button onClick={() => setCloseConfirmProject(null)}
+                className="px-4 py-2 text-sm text-surface-300 hover:text-white rounded-lg transition-colors">
+                Cancel
+              </button>
+              <button onClick={confirmCloseProject}
+                className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg transition-colors">
+                <X className="w-4 h-4" /> Close & Kill Session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

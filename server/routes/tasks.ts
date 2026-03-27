@@ -16,6 +16,7 @@ interface Task {
   startedAt?: string;
   closedAt?: string;
   log?: string;
+  nextTaskId?: string;
 }
 
 function tasksFile(projectPath: string) {
@@ -72,6 +73,7 @@ router.put('/:id', (req: Request, res: Response) => {
   }
   if (title !== undefined) task.title = title;
   if (log !== undefined) (task as any).log = log;
+  if (req.body.nextTaskId !== undefined) task.nextTaskId = req.body.nextTaskId;
   writeTasks(project, tasks);
   res.json({ data: task });
 });

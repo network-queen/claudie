@@ -322,6 +322,15 @@ export default function ProjectsPage() {
   );
 }
 
+const PROJECT_TEMPLATES = [
+  { id: 'blank', name: 'Blank', description: '' },
+  { id: 'react-ts', name: 'React + TypeScript', description: 'React app with TypeScript, Vite, and Tailwind CSS' },
+  { id: 'node-api', name: 'Node.js API', description: 'Express REST API with TypeScript' },
+  { id: 'static', name: 'Static Website', description: 'Simple HTML/CSS/JS website' },
+  { id: 'python-cli', name: 'Python CLI', description: 'Python command-line tool with argparse' },
+  { id: 'chrome-ext', name: 'Chrome Extension', description: 'Chrome browser extension with popup and content script' },
+];
+
 function NewProjectDialog({ onClose, onCreate, creating, createError, newProject, setNewProject }: {
   onClose: () => void;
   onCreate: () => void;
@@ -330,6 +339,15 @@ function NewProjectDialog({ onClose, onCreate, creating, createError, newProject
   newProject: { name: string; parentDir: string; description: string };
   setNewProject: (p: any) => void;
 }) {
+  const [selectedTemplate, setSelectedTemplate] = useState('blank');
+
+  const handleTemplateSelect = (template: typeof PROJECT_TEMPLATES[number]) => {
+    setSelectedTemplate(template.id);
+    if (template.description) {
+      setNewProject({ ...newProject, description: template.description });
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
       <div className="bg-surface-800 border border-surface-700 rounded-xl w-full max-w-lg">
@@ -355,6 +373,25 @@ function NewProjectDialog({ onClose, onCreate, creating, createError, newProject
               <input type="text" value={newProject.parentDir}
                 onChange={(e) => setNewProject({ ...newProject, parentDir: e.target.value })}
                 className="w-full bg-surface-900 border border-surface-700 rounded-lg pl-10 pr-3 py-2 text-sm text-white focus:outline-none focus:border-accent-500" />
+            </div>
+          </div>
+          {/* Template selector */}
+          <div>
+            <label className="block text-xs text-surface-400 mb-1.5">Template</label>
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+              {PROJECT_TEMPLATES.map((tpl) => (
+                <button key={tpl.id} onClick={() => handleTemplateSelect(tpl)}
+                  className={`flex-shrink-0 px-3 py-2 rounded-lg border text-left transition-colors ${
+                    selectedTemplate === tpl.id
+                      ? 'border-accent-500 bg-accent-500/10 text-accent-400'
+                      : 'border-surface-700 bg-surface-900 text-surface-300 hover:border-surface-600 hover:text-white'
+                  }`}>
+                  <span className="text-xs font-medium block whitespace-nowrap">{tpl.name}</span>
+                  {tpl.description && (
+                    <span className="text-[10px] text-surface-500 block mt-0.5 whitespace-nowrap">{tpl.description.slice(0, 30)}...</span>
+                  )}
+                </button>
+              ))}
             </div>
           </div>
           <div>

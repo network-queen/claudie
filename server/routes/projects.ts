@@ -337,6 +337,28 @@ router.post('/clone', (req: Request, res: Response) => {
   }
 });
 
+// Read/write project scripts (start/stop commands)
+router.get('/scripts', (req: Request, res: Response) => {
+  try {
+    const path = req.query.path as string;
+    if (!path) { res.status(400).json({ error: 'path required' }); return; }
+    const file = join(path, '.claudie-scripts.json');
+    if (!existsSync(file)) { res.json({ data: {} }); return; }
+    res.json({ data: JSON.parse(readFileSync(file, 'utf-8')) });
+  } catch { res.json({ data: {} }); }
+});
+
+router.put('/scripts', (req: Request, res: Response) => {
+  try {
+    const { path: projectPath, scripts } = req.body || {};
+    if (!projectPath) { res.status(400).json({ error: 'path required' }); return; }
+    writeFileSync(join(projectPath, '.claudie-scripts.json'), JSON.stringify(scripts, null, 2), 'utf-8');
+    res.json({ data: { written: true } });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save scripts' });
+  }
+});
+
 // Delete a project (permanently removes directory)
 router.delete('/remove', (req: Request, res: Response) => {
   try {
