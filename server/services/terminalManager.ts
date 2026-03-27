@@ -56,7 +56,7 @@ export function createTerminal(id?: string, options: TerminalOptions = {}, sessi
     env,
   } = options;
 
-  const shellArgs = args.length > 0 ? args : [command, '-i'];
+  const shellArgs = [command, '-i'];
   const bridgeArgs = [PTY_BRIDGE, String(cols), String(rows), ...shellArgs];
 
   const child = spawn('python3', bridgeArgs, {

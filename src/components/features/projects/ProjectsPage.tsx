@@ -5,7 +5,6 @@ import {
   GitBranch,
   FileText,
   X,
-  Calendar,
   FolderOpen,
   Trash2,
   Trophy,
@@ -15,8 +14,6 @@ import {
   Download,
 } from 'lucide-react';
 import { useApi } from '@/hooks/useApi';
-import Card from '@/components/shared/Card';
-import Badge from '@/components/shared/Badge';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import ErrorState from '@/components/shared/ErrorState';
 import EmptyState from '@/components/shared/EmptyState';
@@ -340,6 +337,16 @@ function NewProjectDialog({ onClose, onCreate, creating, createError, newProject
   setNewProject: (p: any) => void;
 }) {
   const [selectedTemplate, setSelectedTemplate] = useState('blank');
+  const [toolsInfo, setToolsInfo] = useState<any>(null);
+  const [defaultModel, setDefaultModel] = useState('claude-opus-4-6');
+
+  useEffect(() => {
+    fetch('/api/terminal/claude-info').then((r) => r.json()).then((j) => setToolsInfo(j.data)).catch(() => {});
+  }, []);
+
+  const claudeInstalled = toolsInfo?.claude?.installed;
+  const opencodeInstalled = toolsInfo?.opencode?.installed;
+  const noTools = toolsInfo && !claudeInstalled && !opencodeInstalled;
 
   const handleTemplateSelect = (template: typeof PROJECT_TEMPLATES[number]) => {
     setSelectedTemplate(template.id);
@@ -402,6 +409,35 @@ function NewProjectDialog({ onClose, onCreate, creating, createError, newProject
               placeholder="e.g. I want to build a simple app where people can share their favorite book quotes with friends. Users should be able to sign up, post quotes, and like other people's quotes."
               className="w-full bg-surface-900 border border-surface-700 rounded-lg px-3 py-2 text-sm text-white placeholder-surface-500 focus:outline-none focus:border-accent-500 resize-y" />
           </div>
+          {/* Default model */}
+          <div>
+            <label className="block text-xs text-surface-400 mb-1">Default Model</label>
+            <select value={defaultModel} onChange={(e) => setDefaultModel(e.target.value)}
+              className="w-full appearance-none bg-surface-900 border border-surface-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-500">
+              {claudeInstalled && (
+                <optgroup label="Claude">
+                  <option value="claude-opus-4-6">Opus 4.6</option>
+                  <option value="claude-sonnet-4-6">Sonnet 4.6</option>
+                  <option value="claude-haiku-4-5-20251001">Haiku 4.5</option>
+                </optgroup>
+              )}
+              {opencodeInstalled && (
+                <optgroup label="OpenCode (free)">
+                  {(toolsInfo?.opencode?.models || []).map((m: string) => (
+                    <option key={m} value={m}>{m.replace('opencode/', '')} (free)</option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </div>
+
+          {noTools && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 text-xs text-red-400">
+              No coding tools installed. Install Claude Code or OpenCode to use Claudie.
+              Go to Config → Tools for installation guides.
+            </div>
+          )}
+
           {createError && <p className="text-sm text-red-400">{createError}</p>}
         </div>
 
@@ -410,7 +446,13 @@ function NewProjectDialog({ onClose, onCreate, creating, createError, newProject
             className="px-4 py-2 text-sm text-surface-300 hover:text-white rounded-lg transition-colors">
             Cancel
           </button>
-          <button onClick={onCreate} disabled={creating || !newProject.name.trim()}
+          <button onClick={() => {
+            // Save model for the project
+            const resolvedPath = `${newProject.parentDir.replace(/^~/, '')}/${newProject.name}`;
+            try { localStorage.setItem(`claudie-model-${resolvedPath}`, defaultModel); } catch {}
+            try { localStorage.setItem('claudie-terminal-settings', JSON.stringify({ model: defaultModel })); } catch {}
+            onCreate();
+          }} disabled={creating || !newProject.name.trim() || noTools}
             className="flex items-center gap-2 px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
             {creating ? 'Creating...' : 'Create Project'}
           </button>
@@ -654,19 +696,3 @@ function formatDurationMs(ms: number): string {
   return `${Math.floor(hrs / 24)}d ${hrs % 24}h`;
 }
 
-function Play(props: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={props.className}
-    >
-      <polygon points="6 3 20 12 6 21 6 3" />
-    </svg>
-  );
-}

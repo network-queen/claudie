@@ -24,42 +24,57 @@ const KNOWN_MODELS = [
 ];
 
 export function launchClaudeSession(terminalId: string, options: ClaudeSessionOptions): ClaudeSessionInfo {
-  const claudePath = detectClaudePath();
-  if (!claudePath) {
-    throw new Error('Claude CLI not found. Make sure it is installed and in your PATH.');
-  }
+  const isOpenCode = options.model?.startsWith('opencode/');
 
-  const parts: string[] = [claudePath];
+  let command: string;
 
-  if (options.dangerouslySkipPermissions) {
-    parts.push('--dangerously-skip-permissions');
-  }
-
-  if (options.model) {
-    parts.push('--model', options.model);
-  }
-
-  // Always commit to feature branch after completing work
-  const systemPrompt = [
-    options.systemPrompt || '',
-    'RULE: After completing each task or prompt, always commit all changes to the current feature branch with a descriptive commit message. Never commit directly to master or main.',
-  ].filter(Boolean).join('\n');
-  parts.push('--system-prompt', `"${systemPrompt.replace(/"/g, '\\"')}"`);
-
-  if (options.allowedTools && options.allowedTools.length > 0) {
-    for (const tool of options.allowedTools) {
-      parts.push('--allowedTools', tool);
+  if (isOpenCode) {
+    // Use OpenCode CLI
+    const opencodePath = detectOpenCodePath();
+    if (!opencodePath) {
+      throw new Error('OpenCode CLI not found. Install it from https://opencode.ai');
     }
-  }
+    // OpenCode model IDs include the provider prefix (e.g. opencode/big-pickle)
+    command = `${opencodePath} --model ${options.model}`;
+  } else {
+    // Use Claude CLI
+    const claudePath = detectClaudePath();
+    if (!claudePath) {
+      throw new Error('Claude CLI not found. Make sure it is installed and in your PATH.');
+    }
 
-  if (options.maxTokens) {
-    parts.push('--max-tokens', String(options.maxTokens));
-  }
+    const parts: string[] = [claudePath];
 
-  const command = parts.join(' ');
+    if (options.dangerouslySkipPermissions) {
+      parts.push('--dangerously-skip-permissions');
+    }
+
+    if (options.model) {
+      parts.push('--model', options.model);
+    }
+
+    // Always commit to feature branch after completing work
+    const systemPrompt = [
+      options.systemPrompt || '',
+      'RULE: After completing each task or prompt, always commit all changes to the current feature branch with a descriptive commit message. Never commit directly to master or main.',
+    ].filter(Boolean).join('\n');
+    parts.push('--system-prompt', `"${systemPrompt.replace(/"/g, '\\"')}"`);
+
+    if (options.allowedTools && options.allowedTools.length > 0) {
+      for (const tool of options.allowedTools) {
+        parts.push('--allowedTools', tool);
+      }
+    }
+
+    if (options.maxTokens) {
+      parts.push('--max-tokens', String(options.maxTokens));
+    }
+
+    command = parts.join(' ');
+  }
 
   // Send the command to the terminal followed by Enter
-  writeTerminal(terminalId, command + '\n');
+  writeTerminal(terminalId, command + '\r');
 
   return {
     terminalId,
@@ -71,6 +86,12 @@ export function launchClaudeSession(terminalId: string, options: ClaudeSessionOp
 
 export function getAvailableModels(): string[] {
   return [...KNOWN_MODELS];
+}
+
+export function detectOpenCodePath(): string | null {
+  try {
+    return execSync('which opencode', { encoding: 'utf-8', timeout: 5000 }).trim() || null;
+  } catch { return null; }
 }
 
 export function detectClaudePath(): string | null {

@@ -25,6 +25,7 @@ import configEditorRouter from './routes/configEditor.js';
 import tasksRouter from './routes/tasks.js';
 import claudeChatRouter from './routes/claudeChat.js';
 import telegramRouter from './routes/telegram.js';
+import { setTerminalSender } from './services/telegramBot.js';
 
 import {
   createTerminal,
@@ -216,6 +217,8 @@ function setupWebSocket(server: Server): void {
               dangerouslySkipPermissions: rawOpts.dangerouslySkipPermissions as boolean,
               model: rawOpts.model as string,
             };
+            const isOpenCode = options.model?.startsWith('opencode/');
+
             const id = createTerminal(undefined, {
               cwd: options.projectPath,
               cols: (rawOpts.cols as number) || 80,
@@ -228,31 +231,31 @@ function setupWebSocket(server: Server): void {
             });
             attachToTerminal(id);
 
-            // Watch terminal output for trust prompt and auto-confirm
-            let trustHandled = false;
-            const trustWatcher = (data: string) => {
-              if (trustHandled) return;
-              // Claude shows "Do you trust" or "Trust" prompt — auto-confirm with Enter
-              if (data.includes('trust') || data.includes('Trust') || data.includes('TRUST')) {
-                trustHandled = true;
-                // Send Enter to confirm the default "Yes" option
-                setTimeout(() => writeTerminal(id, '\r'), 300);
-              }
-            };
-            onTerminalData(id, trustWatcher);
-            // Remove watcher after 15s
-            setTimeout(() => offTerminalData(id, trustWatcher), 15000);
+            if (!isOpenCode) {
+              // Claude: trust watcher
+              let trustHandled = false;
+              const trustWatcher = (data: string) => {
+                if (trustHandled) return;
+                if (data.includes('trust') || data.includes('Trust') || data.includes('TRUST')) {
+                  trustHandled = true;
+                  setTimeout(() => writeTerminal(id, '\r'), 300);
+                }
+              };
+              onTerminalData(id, trustWatcher);
+              setTimeout(() => offTerminalData(id, trustWatcher), 15000);
+            }
 
-            // Small delay to let shell initialize before sending claude command
+            // Launch command into shell — same approach for both CLIs
             setTimeout(() => {
               try {
                 const session = launchClaudeSession(id, options);
                 send({ type: 'session', id, session });
               } catch (err) {
-                const errMsg = err instanceof Error ? err.message : 'Failed to launch Claude';
+                const errMsg = err instanceof Error ? err.message : 'Failed to launch';
                 send({ type: 'error', message: errMsg });
               }
-            }, 300);
+            }, 1500);
+
             send({ type: 'created', id });
             break;
           }
@@ -287,6 +290,16 @@ export function startServer(port: number): Server {
   const httpServer = createServer(app);
 
   setupWebSocket(httpServer);
+
+  // Connect Telegram bot to terminal — find session by project path and send input
+  setTerminalSender((projectPath: string, text: string) => {
+    const sessions = listTerminals();
+    const session = sessions.find((s) => s.alive && s.sessionConfig?.projectPath === projectPath);
+    if (session) {
+      return writeTerminal(session.id, text);
+    }
+    return false;
+  });
 
   httpServer.listen(port, '127.0.0.1', () => {
     console.log(`Claudie server running at http://localhost:${port}`);

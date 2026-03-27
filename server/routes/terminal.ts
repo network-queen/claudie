@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { execSync } from 'child_process';
 import {
   createTerminal,
   listTerminals,
@@ -71,16 +72,42 @@ router.delete('/:id', (req: Request, res: Response) => {
 // Claude CLI info
 router.get('/claude-info', (_req: Request, res: Response) => {
   try {
-    const path = detectClaudePath();
+    const claudePath = detectClaudePath();
+    let claudeVersion = '';
+    if (claudePath) {
+      try { claudeVersion = execSync(`${claudePath} --version 2>/dev/null`, { encoding: 'utf-8', timeout: 5000 }).trim(); } catch {}
+    }
+
+    let opencodePath: string | null = null;
+    let opencodeVersion = '';
+    try { opencodePath = execSync('which opencode', { encoding: 'utf-8', timeout: 5000 }).trim() || null; } catch {}
+    if (opencodePath) {
+      try { opencodeVersion = execSync('opencode --version 2>/dev/null', { encoding: 'utf-8', timeout: 5000 }).trim(); } catch {}
+    }
+
+    let opencodeModels: string[] = [];
+    if (opencodePath) {
+      try { opencodeModels = execSync('opencode models 2>/dev/null', { encoding: 'utf-8', timeout: 10000 }).trim().split('\n').filter(Boolean); } catch {}
+    }
+
     res.json({
       data: {
-        installed: !!path,
-        path: path || null,
-        models: getAvailableModels(),
+        claude: {
+          installed: !!claudePath,
+          path: claudePath,
+          version: claudeVersion,
+          models: getAvailableModels(),
+        },
+        opencode: {
+          installed: !!opencodePath,
+          path: opencodePath,
+          version: opencodeVersion,
+          models: opencodeModels,
+        },
       },
     });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to get Claude info' });
+    res.status(500).json({ error: 'Failed to get tools info' });
   }
 });
 

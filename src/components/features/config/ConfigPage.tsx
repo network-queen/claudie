@@ -18,9 +18,10 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import ErrorState from '@/components/shared/ErrorState';
 import EmptyState from '@/components/shared/EmptyState';
 
-type TabId = 'settings' | 'mcp' | 'claude-md' | 'telegram';
+type TabId = 'settings' | 'tools' | 'mcp' | 'claude-md' | 'telegram';
 
 const tabs: { id: TabId; label: string; icon: typeof Settings }[] = [
+  { id: 'tools', label: 'Tools', icon: Settings },
   { id: 'settings', label: 'Settings', icon: Settings },
   { id: 'mcp', label: 'MCP Servers', icon: Plug },
   { id: 'claude-md', label: 'CLAUDE.md', icon: FileText },
@@ -38,6 +39,97 @@ function Notification({ type, text }: { type: 'success' | 'error'; text: string 
     >
       {type === 'success' ? <Check className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
       {text}
+    </div>
+  );
+}
+
+function ToolsTab() {
+  const [info, setInfo] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/terminal/claude-info').then((r) => r.json()).then((j) => { setInfo(j.data); setLoading(false); }).catch(() => setLoading(false));
+  }, []);
+
+  if (loading) return <LoadingSpinner />;
+
+  const claude = info?.claude || {};
+  const opencode = info?.opencode || {};
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-sm font-medium text-white mb-3">Installed Tools</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Claude Code */}
+          <Card>
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`w-3 h-3 rounded-full ${claude.installed ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className="text-sm font-semibold text-white">Claude Code</span>
+              {claude.version && <span className="text-[10px] text-surface-500 font-mono">{claude.version}</span>}
+            </div>
+            {claude.installed ? (
+              <div className="space-y-2">
+                <p className="text-xs text-surface-400 font-mono">{claude.path}</p>
+                <p className="text-xs text-surface-500">{claude.models?.length || 0} models available</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-red-400">Not installed</p>
+                <div className="bg-surface-900 rounded-lg px-3 py-2 text-xs font-mono text-surface-300">
+                  npm install -g @anthropic-ai/claude-code
+                </div>
+                <a href="https://docs.anthropic.com/en/docs/claude-code" target="_blank" rel="noopener noreferrer"
+                  className="text-xs text-accent-400 hover:underline">Installation guide →</a>
+              </div>
+            )}
+          </Card>
+
+          {/* OpenCode */}
+          <Card>
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`w-3 h-3 rounded-full ${opencode.installed ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className="text-sm font-semibold text-white">OpenCode</span>
+              {opencode.version && <span className="text-[10px] text-surface-500 font-mono">{opencode.version}</span>}
+            </div>
+            {opencode.installed ? (
+              <div className="space-y-2">
+                <p className="text-xs text-surface-400 font-mono">{opencode.path}</p>
+                <p className="text-xs text-surface-500">{opencode.models?.length || 0} free models available</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-red-400">Not installed</p>
+                <div className="bg-surface-900 rounded-lg px-3 py-2 text-xs font-mono text-surface-300">
+                  curl -fsSL https://opencode.ai/install | bash
+                </div>
+                <a href="https://opencode.ai" target="_blank" rel="noopener noreferrer"
+                  className="text-xs text-accent-400 hover:underline">Installation guide →</a>
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
+
+      {/* Available models */}
+      <div>
+        <h3 className="text-sm font-medium text-white mb-3">Available Models</h3>
+        <div className="space-y-1">
+          {claude.installed && claude.models?.map((m: string) => (
+            <div key={m} className="flex items-center gap-2 px-3 py-1.5 bg-surface-900 rounded text-xs">
+              <span className="px-1.5 py-0.5 bg-accent-500/15 text-accent-400 text-[9px] rounded">claude</span>
+              <span className="text-surface-200 font-mono">{m}</span>
+            </div>
+          ))}
+          {opencode.installed && opencode.models?.map((m: string) => (
+            <div key={m} className="flex items-center gap-2 px-3 py-1.5 bg-surface-900 rounded text-xs">
+              <span className="px-1.5 py-0.5 bg-cyan-500/15 text-cyan-400 text-[9px] rounded">opencode</span>
+              <span className="text-surface-200 font-mono">{m}</span>
+              <span className="text-[9px] text-green-500/60">free</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -683,6 +775,7 @@ export default function ConfigPage() {
       </div>
 
       {/* Tab content */}
+      {activeTab === 'tools' && <ToolsTab />}
       {activeTab === 'settings' && <SettingsTab />}
       {activeTab === 'mcp' && <McpTab />}
       {activeTab === 'claude-md' && <ClaudeMdTab />}

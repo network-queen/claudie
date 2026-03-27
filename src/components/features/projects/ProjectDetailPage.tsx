@@ -40,9 +40,15 @@ const XTERM_THEME = {
 };
 
 const MODELS = [
-  { value: 'claude-opus-4-6', label: 'Opus 4.6' },
-  { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
-  { value: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
+  { value: 'claude-opus-4-6', label: 'Opus 4.6', cli: 'claude' },
+  { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6', cli: 'claude' },
+  { value: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5', cli: 'claude' },
+  { value: 'opencode/big-pickle', label: 'Big Pickle (free)', cli: 'opencode' },
+  { value: 'opencode/gpt-5-nano', label: 'GPT-5 Nano (free)', cli: 'opencode' },
+  { value: 'opencode/mimo-v2-omni-free', label: 'Mimo V2 Omni (free)', cli: 'opencode' },
+  { value: 'opencode/mimo-v2-pro-free', label: 'Mimo V2 Pro (free)', cli: 'opencode' },
+  { value: 'opencode/minimax-m2.5-free', label: 'MiniMax M2.5 (free)', cli: 'opencode' },
+  { value: 'opencode/nemotron-3-super-free', label: 'Nemotron 3 Super (free)', cli: 'opencode' },
 ];
 
 const STORAGE_KEY = 'claudie-terminal-settings';
@@ -168,7 +174,9 @@ export default function ProjectDetailPage() {
   const lastCommitCountRef = useRef(0);
 
   // Terminal
-  const [model, setModel] = useState(saved.model || 'claude-opus-4-6');
+  const [model, setModel] = useState(() => {
+    try { return localStorage.getItem(`claudie-model-${projectPath}`) || saved.model || 'claude-opus-4-6'; } catch { return 'claude-opus-4-6'; }
+  });
   const [skipPermissions] = useState(true);
   const [appRunning, setAppRunning] = useState(false);
   const [projectScripts, setProjectScripts] = useState<{ start?: string; stop?: string }>({});
@@ -187,13 +195,13 @@ export default function ProjectDetailPage() {
     const script = projectScripts[action];
     if (script) {
       // Use cached script directly in shell (bypass Claude)
-      sendWs({ type: 'input', id: termIdRef.current, data: `!${script}\r` });
+      sendToActiveTerminal(`!${script}\r`);
     } else {
       // First time — ask Claude, then watch for the command it runs
       const prompt = action === 'start'
         ? 'start the project in dev mode. Tell me the exact command you used.'
         : 'stop the project, kill all running dev servers. Tell me the exact command you used.';
-      sendWs({ type: 'input', id: termIdRef.current, data: prompt + '\r' });
+      sendToActiveTerminal(prompt + '\r');
     }
     setAppRunning(action === 'start');
   };
@@ -207,6 +215,7 @@ export default function ProjectDetailPage() {
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const termIdRef = useRef<string | null>(null);
+  const activeCli = MODELS.find((m) => m.value === model)?.cli || 'claude';
 
 
   // --- Notify when Claude is waiting ---
@@ -294,6 +303,8 @@ export default function ProjectDetailPage() {
 
   useEffect(() => { fetchTree(); const iv = setInterval(fetchTree, 10000); return () => clearInterval(iv); }, [fetchTree]);
 
+
+
   // Set active project for Telegram bot
   useEffect(() => {
     if (projectPath) fetch('/api/telegram/active-project', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: projectPath }) }).catch(() => {});
@@ -374,7 +385,7 @@ export default function ProjectDetailPage() {
 
   const runSkill = (skill: { name: string; content: string }) => {
     if (!termIdRef.current) return;
-    sendWs({ type: 'input', id: termIdRef.current, data: `/${skill.name}\r` });
+    sendToActiveTerminal(`/${skill.name}\r`);
   };
 
   const fetchGitInfo = useCallback(async () => {
@@ -419,7 +430,7 @@ export default function ProjectDetailPage() {
     try {
       if (termIdRef.current) {
         const branch = featureBranch || 'HEAD';
-        sendWs({ type: 'input', id: termIdRef.current, data: `push all committed changes to the remote branch ${branch}\r` });
+        sendToActiveTerminal(`push all committed changes to the remote branch ${branch}\r`);
       }
     } finally { setTimeout(() => setPushing(false), 2000); }
   };
@@ -490,7 +501,7 @@ export default function ProjectDetailPage() {
       setCommentingTaskId(null);
       // Send comment to Claude as feedback
       if (termIdRef.current && task) {
-        sendWs({ type: 'input', id: termIdRef.current, data: `Feedback on task "${task.title}": ${text}\r` });
+        sendToActiveTerminal(`Feedback on task "${task.title}": ${text}\r`);
       }
     } catch {}
   };
@@ -512,7 +523,7 @@ export default function ProjectDetailPage() {
         await fetch(`/api/tasks/${taskId}/comment`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ project: projectPath, text: `[Attachment: ${file.name}] saved at ${filePath}` }) });
         fetchTasks();
-        sendWs({ type: 'input', id: termIdRef.current, data: `I attached a file "${file.name}" for task "${task.title}". It's saved at ${filePath}. Please read and use it.\r` });
+        sendToActiveTerminal(`I attached a file "${file.name}" for task "${task.title}". It's saved at ${filePath}. Please read and use it.\r`);
       }
     } catch {}
   };
@@ -559,8 +570,8 @@ export default function ProjectDetailPage() {
   };
 
 
+
   const sendTaskToClaude = (task: Task) => {
-    if (!termIdRef.current) return;
     activeTaskIdRef.current = task.id;
     if (!taskLogsRef.current[task.id]) taskLogsRef.current[task.id] = '';
     updateTaskStatus(task.id, 'in-progress');
@@ -569,11 +580,10 @@ export default function ProjectDetailPage() {
       ? `Task [${taskRef}]: ${task.title}\n\nFeedback/context:\n${task.comments.map(c => `- ${c.text}`).join('\n')}`
       : `Task [${taskRef}]: ${task.title}`;
     prompt += `\n\nInclude [${taskRef}] in your commit message.`;
-    sendWs({ type: 'input', id: termIdRef.current, data: prompt + '\r' });
+    sendToActiveTerminal(prompt + '\r');
   };
 
   const sendAllTasksToClaude = () => {
-    if (!termIdRef.current) return;
     const openTasks = tasks.filter((t) => t.status === 'open');
     if (openTasks.length === 0) return;
     openTasks.forEach((t) => updateTaskStatus(t.id, 'in-progress'));
@@ -583,7 +593,22 @@ export default function ProjectDetailPage() {
         if (t.comments.length > 0) line += `\n   Context: ${t.comments.map(c => c.text).join('; ')}`;
         return line;
       }).join('\n');
-    sendWs({ type: 'input', id: termIdRef.current, data: prompt + '\r' });
+    sendToActiveTerminal(prompt + '\r');
+  };
+
+  // Helper to send input to whichever terminal is active
+  const sendToActiveTerminal = (text: string) => {
+    if (!termIdRef.current) return;
+    // For TUI apps like OpenCode: send text first, then Enter separately
+    if (text.endsWith('\r')) {
+      const body = text.slice(0, -1);
+      sendWs({ type: 'input', id: termIdRef.current, data: body });
+      setTimeout(() => {
+        if (termIdRef.current) sendWs({ type: 'input', id: termIdRef.current, data: '\r' });
+      }, 100);
+    } else {
+      sendWs({ type: 'input', id: termIdRef.current, data: text });
+    }
   };
 
   // Feature 4: Chain a task as next after the current in-progress task
@@ -604,35 +629,52 @@ export default function ProjectDetailPage() {
     if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify(data));
   }, []);
 
+  // Create xterm instances for both CLIs
   useEffect(() => {
     if (!projectPath) return;
-    const term = new Terminal({ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, theme: XTERM_THEME,
-      cursorBlink: true, allowProposedApi: true, scrollback: 5000 });
+
+    const term = new Terminal({ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, theme: XTERM_THEME, cursorBlink: true, allowProposedApi: true, scrollback: 5000 });
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     termRef.current = term; fitRef.current = fitAddon;
 
+    // WebSocket
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/terminal`);
     wsRef.current = ws;
 
+    term.onData((data) => {
+      if (termIdRef.current) sendWs({ type: 'input', id: termIdRef.current, data });
+      setClaudeWaiting(false);
+      notifiedRef.current = false;
+      if (outputTimerRef.current) clearTimeout(outputTimerRef.current);
+    });
+
     ws.onopen = () => {
       setWsConnected(true);
+      // Find existing session matching current CLI
       fetch('/api/terminal/sessions').then((r) => r.json()).then((j) => {
-        const existing = (j.data || []).find((s: any) => s.alive && s.sessionConfig?.projectPath === projectPath);
+        const sessions = j.data || [];
+        const isOC = model.startsWith('opencode/');
+        const existing = sessions.find((s: any) => {
+          if (!s.alive || s.sessionConfig?.projectPath !== projectPath) return false;
+          const sIsOC = s.sessionConfig?.model?.startsWith('opencode/');
+          return isOC === sIsOC;
+        });
+
         if (existing) {
           termIdRef.current = existing.id;
           ws.send(JSON.stringify({ type: 'attach', id: existing.id }));
-        } else if (termContainerRef.current) {
-          term.open(termContainerRef.current); fitAddon.fit(); term.focus();
+          setTerminalReady(true);
+          if (termContainerRef.current) { term.open(termContainerRef.current); fitAddon.fit(); term.focus(); }
+        } else {
+          if (termContainerRef.current) { term.open(termContainerRef.current); fitAddon.fit(); term.focus(); }
           ws.send(JSON.stringify({ type: 'claude',
             options: { projectPath, dangerouslySkipPermissions: skipPermissions, model, cols: term.cols, rows: term.rows } }));
         }
       }).catch(() => {
-        if (termContainerRef.current) {
-          term.open(termContainerRef.current); fitAddon.fit(); term.focus();
-          ws.send(JSON.stringify({ type: 'claude', options: { projectPath, dangerouslySkipPermissions: skipPermissions, model } }));
-        }
+        if (termContainerRef.current) { term.open(termContainerRef.current); fitAddon.fit(); term.focus(); }
+        ws.send(JSON.stringify({ type: 'claude', options: { projectPath, dangerouslySkipPermissions: skipPermissions, model } }));
       });
     };
 
@@ -640,13 +682,16 @@ export default function ProjectDetailPage() {
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === 'created' && msg.id) {
-          termIdRef.current = msg.id; setTerminalReady(true);
+          termIdRef.current = msg.id;
+          setTerminalReady(true);
           if (termContainerRef.current && !term.element) { term.open(termContainerRef.current); fitAddon.fit(); term.focus(); }
         } else if (msg.type === 'attached') {
           setTerminalReady(true);
           if (termContainerRef.current && !term.element) { term.open(termContainerRef.current); fitAddon.fit(); term.focus(); }
         } else if (msg.type === 'output' && msg.data) {
-          term.write(msg.data);
+          // Strip DECRQM sequences that crash xterm.js (\x1b[?<n>$p)
+          const safeData = msg.data.replace(/\x1b\[\?[0-9]+\$p/g, '');
+          try { term.write(safeData); } catch {}
           // Capture output for active task log (filter thinking lines)
           if (activeTaskIdRef.current) {
             const clean = msg.data.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
@@ -677,12 +722,6 @@ export default function ProjectDetailPage() {
     };
     ws.onclose = () => setWsConnected(false);
     ws.onerror = () => ws.close();
-    term.onData((data) => {
-      if (termIdRef.current) sendWs({ type: 'input', id: termIdRef.current, data });
-      setClaudeWaiting(false);
-      notifiedRef.current = false;
-      if (outputTimerRef.current) clearTimeout(outputTimerRef.current);
-    });
     return () => { ws.close(); term.dispose(); };
   }, [projectPath]);
 
@@ -725,14 +764,34 @@ export default function ProjectDetailPage() {
         <div className="flex items-center gap-1.5">
           <select value={model} onChange={(e) => {
             const newModel = e.target.value;
+            const oldCli = MODELS.find((m) => m.value === model)?.cli;
+            const newCli = MODELS.find((m) => m.value === newModel)?.cli;
             setModel(newModel);
-            try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...loadSettings(), model: newModel })); } catch {}
-            if (termIdRef.current) { sendWs({ type: 'input', id: termIdRef.current, data: `/model ${newModel}\r` }); }
+            try { localStorage.setItem(`claudie-model-${projectPath}`, newModel); } catch {}
+
+            if (oldCli === newCli) {
+              // Same CLI — switch model in current session
+              if (newCli === 'claude' && termIdRef.current) {
+                if (termIdRef.current) sendWs({ type: 'input', id: termIdRef.current, data: `/model ${newModel}\r` });
+              }
+            } else {
+              // Different CLI — reload (new model saved in localStorage)
+              window.location.reload();
+            }
           }}
             className="appearance-none bg-accent-500/15 text-accent-400 text-[10px] font-mono rounded px-2 py-0.5 border-0 focus:outline-none focus:ring-1 focus:ring-accent-500 cursor-pointer">
-            {MODELS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+            <optgroup label="Claude">
+              {MODELS.filter((m) => m.cli === 'claude').map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </optgroup>
+            <optgroup label="OpenCode (free)">
+              {MODELS.filter((m) => m.cli === 'opencode').map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </optgroup>
           </select>
-          {skipPermissions && (
+          <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded ${
+            MODELS.find((m) => m.value === model)?.cli === 'opencode'
+              ? 'bg-cyan-500/15 text-cyan-400' : 'bg-accent-500/15 text-accent-400'
+          }`}>{MODELS.find((m) => m.value === model)?.cli || 'claude'}</span>
+          {skipPermissions && MODELS.find((m) => m.value === model)?.cli === 'claude' && (
             <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/15 text-amber-400 text-[10px] rounded">
               <ShieldOff className="w-3 h-3" /> skip-permissions
             </span>
@@ -1109,8 +1168,14 @@ export default function ProjectDetailPage() {
             </div>
           )}
 
-          {/* Terminal — always rendered, hidden behind editor when file is open */}
+          {/* Terminal */}
           <div className="flex-1 bg-[#0f0f14] relative min-h-[100px]">
+            {!terminalReady && !openFile && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-20">
+                <Loader2 className="w-8 h-8 text-accent-400 animate-spin" />
+                <span className="text-xs text-surface-500">Starting {activeCli === 'opencode' ? 'OpenCode' : 'Claude'}...</span>
+              </div>
+            )}
             <div ref={termContainerRef} className="absolute inset-0" style={{ padding: '4px' }} />
             <button onClick={() => termRef.current?.clear()} disabled={!terminalReady}
               className={`absolute top-2 right-2 z-10 px-2 py-1 bg-surface-800/80 hover:bg-surface-700 disabled:opacity-40 text-surface-400 hover:text-surface-200 text-[10px] rounded transition-colors backdrop-blur-sm ${openFile ? 'hidden' : ''}`}>
@@ -1469,7 +1534,7 @@ export default function ProjectDetailPage() {
                 setShowDiffReview(false);
                 setDiffFeedback('');
                 if (termIdRef.current) {
-                  sendWs({ type: 'input', id: termIdRef.current, data: 'Changes approved. Continue.\r' });
+                  sendToActiveTerminal('Changes approved. Continue.\r');
                 }
               }}
               className="flex items-center gap-1.5 px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
@@ -1482,7 +1547,7 @@ export default function ProjectDetailPage() {
                 if (!diffFeedback.trim()) return;
                 setShowDiffReview(false);
                 if (termIdRef.current) {
-                  sendWs({ type: 'input', id: termIdRef.current, data: `Changes need revision: ${diffFeedback.trim()}\r` });
+                  sendToActiveTerminal(`Changes need revision: ${diffFeedback.trim()}\r`);
                 }
                 setDiffFeedback('');
               }}
@@ -1531,7 +1596,7 @@ export default function ProjectDetailPage() {
                 if (e.key === 'Enter' && diffFeedback.trim()) {
                   setShowDiffReview(false);
                   if (termIdRef.current) {
-                    sendWs({ type: 'input', id: termIdRef.current, data: `Changes need revision: ${diffFeedback.trim()}\r` });
+                    sendToActiveTerminal(`Changes need revision: ${diffFeedback.trim()}\r`);
                   }
                   setDiffFeedback('');
                 }

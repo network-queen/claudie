@@ -19,6 +19,10 @@ let activeProject = '';
 export function setActiveProject(path: string) { activeProject = path; }
 export function getActiveProject() { return activeProject; }
 
+// Terminal integration — set by server/index.ts
+let sendToTerminal: ((projectPath: string, text: string) => boolean) | null = null;
+export function setTerminalSender(fn: (projectPath: string, text: string) => boolean) { sendToTerminal = fn; }
+
 export function loadTelegramConfig(): TelegramConfig {
   try {
     if (existsSync(CONFIG_FILE)) {
@@ -173,7 +177,12 @@ async function handleMessage(text: string, chatId: string) {
     task.status = 'in-progress';
     task.startedAt = new Date().toISOString();
     writeTasks(activeProject, tasks);
-    await sendTelegramMessage(`▶️ Running in *${projectName}*: *${task.title}*\n\n_Open Claudie to see Claude working on it._`, chatId);
+    const sent = sendToTerminal ? sendToTerminal(activeProject, `Task [${task.id.slice(0, 8)}]: ${task.title}\n\nInclude [${task.id.slice(0, 8)}] in your commit message.\r`) : false;
+    if (sent) {
+      await sendTelegramMessage(`▶️ Sent to Claude in *${projectName}*: *${task.title}*`, chatId);
+    } else {
+      await sendTelegramMessage(`▶️ Task marked in-progress in *${projectName}*: *${task.title}*\n\n⚠️ No active Claude session — open the project in Claudie.`, chatId);
+    }
   }
 
   else if (text === '/tasks') {
@@ -192,10 +201,16 @@ async function handleMessage(text: string, chatId: string) {
     if (!title) { await sendTelegramMessage('Usage: /do <description>', chatId); return; }
     if (!activeProject) { await sendTelegramMessage('❌ No project selected. Use /use <name>', chatId); return; }
     const tasks = readTasks(activeProject);
-    const task = { id: randomUUID(), title, status: 'in-progress' as const, comments: [], createdAt: new Date().toISOString(), startedAt: new Date().toISOString() };
+    const taskRef = randomUUID();
+    const task = { id: taskRef, title, status: 'in-progress' as const, comments: [], createdAt: new Date().toISOString(), startedAt: new Date().toISOString() };
     tasks.push(task);
     writeTasks(activeProject, tasks);
-    await sendTelegramMessage(`⚡ Task created & started in *${projectName}*:\n*${title}*\nID: \`${task.id.slice(0, 8)}\`\n\n_Open Claudie — Claude will pick it up._`, chatId);
+    const sent = sendToTerminal ? sendToTerminal(activeProject, `Task [${taskRef.slice(0, 8)}]: ${title}\n\nInclude [${taskRef.slice(0, 8)}] in your commit message.\r`) : false;
+    if (sent) {
+      await sendTelegramMessage(`⚡ Task sent to Claude in *${projectName}*:\n*${title}*\nID: \`${taskRef.slice(0, 8)}\``, chatId);
+    } else {
+      await sendTelegramMessage(`⚡ Task created in *${projectName}*:\n*${title}*\nID: \`${taskRef.slice(0, 8)}\`\n\n⚠️ No active Claude session — open the project in Claudie to execute.`, chatId);
+    }
   }
 
   else if (text === '/status') {
